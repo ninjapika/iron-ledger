@@ -1,0 +1,17 @@
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: iron_ledger
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: iron_ledger_dev
+    ports:
+      # Exposed to localhost only — fine for local dev, never do this in prod.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - iron_ledger_dev_data:/var/lib/postgresql/data
+
+volumes:
+  iron_ledger_dev_data:

@@ -1,0 +1,459 @@
+@import "tailwindcss";
+
+/*
+  Iron Ledger — theme engine, take three.
+
+  Down to four themes, each built to feel like a genuinely different
+  application, not one layout repainted four times. Every theme still
+  shares the same structural tokens (bg/surface/border/text, the four
+  accent roles, the four workout-type colors) so every component and every
+  chart works unmodified everywhere — but each theme now ALSO defines its
+  own corner language (soft rounding vs. cut-corner clip paths), its own
+  animated background layer, and its own take on buttons, cards and
+  headings via scoped overrides below. Swapping themes changes shape,
+  motion and texture, not just hue.
+
+    theme            shape                  background layer         personality
+    Graphite Rust    2px, square, no clip   fine paper grain, static  flat, matte, editorial — deliberately calm
+    Neon Static      sharp cut corners      scanline sweep + grid     cyberpunk, electric, a little unstable
+    Gotham Watch     single notched corner  searchlight sweep + fog   dark, dramatic, one accent, high contrast
+    Glacier Drift    soft, frosted glass    drifting aurora wash      cool, airy, translucent surfaces
+*/
+
+:root,
+[data-theme="graphite-rust"] {
+  --bg: #131313;
+  --surface: #1b1b1b;
+  --surface-2: #232323;
+  --border: #313131;
+  --text: #ece8e3;
+  --text-muted: #99938c;
+  --accent-strength: #c1502e;
+  --accent-cardio: #6c8ebf;
+  --accent-highlight: #d4a373;
+  --accent-danger: #d13b3b;
+  --radius: 2px;
+  --shape-clip: none;
+  --surface-blur: 0px;
+  --surface-alpha: 1;
+  /* Deliberately no glow — the calm, restrained one of the four, so the
+     other three read as "dramatic by design" rather than "everything
+     glows because that's the default." */
+  --glow: none;
+  --glow-soft: none;
+  --font-display-theme: var(--font-display-base);
+  --type-strength: #d9784a;
+  --type-cardio: #6c9bd1;
+  --type-skill: #a98cc7;
+  --type-manual: #99938c;
+}
+
+[data-theme="neon-static"] {
+  --bg: #08060f;
+  --surface: #120e22;
+  --surface-2: #1c1533;
+  --border: #33245c;
+  --text: #eef0ff;
+  --text-muted: #948fc4;
+  --accent-strength: #ff2e88;
+  --accent-cardio: #00e5ff;
+  --accent-highlight: #f5ff33;
+  --accent-danger: #ff3860;
+  --radius: 2px;
+  --shape-clip: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  --surface-blur: 0px;
+  --surface-alpha: 1;
+  --glow: 0 0 0 1px color-mix(in srgb, var(--accent-cardio) 45%, transparent), 0 0 26px -2px color-mix(in srgb, var(--accent-strength) 65%, transparent), 0 0 46px -6px color-mix(in srgb, var(--accent-cardio) 55%, transparent);
+  --glow-soft: 0 0 18px -3px color-mix(in srgb, var(--accent-cardio) 55%, transparent);
+  --font-display-theme: "Orbitron", var(--font-display-base);
+  --type-strength: #ff9d4d;
+  --type-cardio: #22e0ff;
+  --type-skill: #c68cff;
+  --type-manual: #948fc4;
+}
+
+[data-theme="gotham-watch"] {
+  --bg: #060607;
+  --surface: #0e0f11;
+  --surface-2: #17181b;
+  --border: #26282c;
+  --text: #e8e9ea;
+  --text-muted: #82858c;
+  --accent-strength: #a3231f;
+  --accent-cardio: #4c6b8a;
+  --accent-highlight: #f0c419;
+  --accent-danger: #c8342f;
+  --radius: 3px;
+  --shape-clip: polygon(0 0, 100% 0, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+  --surface-blur: 0px;
+  --surface-alpha: 1;
+  --glow: 0 0 0 1px color-mix(in srgb, var(--accent-highlight) 30%, transparent), 0 8px 32px -8px color-mix(in srgb, var(--accent-highlight) 35%, transparent);
+  --glow-soft: 0 4px 20px -6px color-mix(in srgb, var(--accent-highlight) 30%, transparent);
+  --font-display-theme: "Bebas Neue", var(--font-display-base);
+  --type-strength: #c1443f;
+  --type-cardio: #5b7fa3;
+  --type-skill: #8f7bb8;
+  --type-manual: #82858c;
+}
+
+[data-theme="glacier-drift"] {
+  --bg: #0a141b;
+  --surface: color-mix(in srgb, #172733 78%, transparent);
+  --surface-2: color-mix(in srgb, #1f3441 72%, transparent);
+  --border: color-mix(in srgb, #cfeeff 16%, transparent);
+  --text: #eaf3f8;
+  --text-muted: #86a5b8;
+  --accent-strength: #ff8f6b;
+  --accent-cardio: #5ec8ea;
+  --accent-highlight: #bfe9ff;
+  --accent-danger: #ff7a7a;
+  --radius: 18px;
+  --shape-clip: none;
+  --surface-blur: 16px;
+  --surface-alpha: 0.78;
+  --glow: 0 0 0 1px color-mix(in srgb, var(--accent-cardio) 25%, transparent), 0 8px 36px -8px color-mix(in srgb, var(--accent-cardio) 40%, transparent);
+  --glow-soft: 0 4px 22px -6px color-mix(in srgb, var(--accent-cardio) 30%, transparent);
+  --font-display-theme: var(--font-display-base);
+  --type-strength: #ffa585;
+  --type-cardio: #62d2f2;
+  --type-skill: #b79bea;
+  --type-manual: #86a5b8;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent-strength: var(--accent-strength);
+  --color-accent-cardio: var(--accent-cardio);
+  --color-accent-highlight: var(--accent-highlight);
+  --color-accent-danger: var(--accent-danger);
+  --color-type-strength: var(--type-strength);
+  --color-type-cardio: var(--type-cardio);
+  --color-type-skill: var(--type-skill);
+  --color-type-manual: var(--type-manual);
+  --radius-theme: var(--radius);
+
+  --font-display-base: "Big Shoulders Display", sans-serif;
+  --font-display: var(--font-display-theme);
+  --font-sans: "Manrope", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+/* Soft tinted fills, derived so each theme only has to define the four
+   accent hues above — never a separate "soft" variant to keep in sync. */
+.fill-strength-soft { background-color: color-mix(in srgb, var(--accent-strength) 14%, transparent); }
+.fill-cardio-soft { background-color: color-mix(in srgb, var(--accent-cardio) 14%, transparent); }
+.fill-highlight-soft { background-color: color-mix(in srgb, var(--accent-highlight) 16%, transparent); }
+.fill-danger-soft { background-color: color-mix(in srgb, var(--accent-danger) 14%, transparent); }
+
+/* Glow utilities — the per-theme --glow token does the real work, these
+   just apply it. On Graphite Rust, --glow is "none", so these become a
+   deliberate no-op rather than needing a separate code path. */
+.glow-strength { box-shadow: var(--glow-soft); }
+.glow-interactive { transition: box-shadow 200ms ease, transform 150ms ease, border-color 200ms ease; }
+.glow-interactive:hover { box-shadow: var(--glow-soft); }
+
+/* Shape language: every rounded-theme element (Card, Button, inputs) picks
+   up both the per-theme radius AND clip-path in one place, so the whole
+   app's shape vocabulary changes from one theme swap. clip-path is "none"
+   for the two themes that don't use it, making this a true no-op there. */
+.rounded-theme {
+  clip-path: var(--shape-clip);
+}
+
+/* Glacier Drift's surfaces are translucent + blurred (frosted glass) —
+   every other theme keeps --surface-blur at 0px, so this is a no-op for
+   them rather than needing its own conditional. */
+.bg-surface,
+.bg-surface-2 {
+  backdrop-filter: blur(var(--surface-blur));
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* ================= Background FX layer =================
+   One shared DOM structure (rendered once in the root layout), CSS-only,
+   toggled entirely by [data-theme]. Fixed behind everything else — see
+   the z-index note on .theme-fx and .app-shell below. Every layer here is
+   opacity/transform-only (no layout thrash) and gets fully disabled under
+   prefers-reduced-motion further down. */
+
+.theme-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--bg);
+  transition: background-color 400ms ease;
+}
+
+/* App content sits in its own stacking context above the FX layer. Set on
+   the outermost wrapper in each route group's layout. */
+.app-shell {
+  position: relative;
+  z-index: 1;
+}
+
+.fx-layer { position: absolute; inset: 0; opacity: 0; }
+
+/* ---- Graphite Rust: fine grain only, no extra motion layer ---- */
+[data-theme="graphite-rust"] .fx-grain {
+  opacity: 1;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 5%, transparent) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+}
+
+/* ---- Neon Static: scanline sweep + a horizon grid glow ---- */
+[data-theme="neon-static"] .fx-grid {
+  opacity: 1;
+  background-image:
+    linear-gradient(90deg, color-mix(in srgb, var(--accent-cardio) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(0deg, color-mix(in srgb, var(--accent-cardio) 7%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 90% 60% at 50% 100%, black 0%, transparent 70%);
+}
+[data-theme="neon-static"] .fx-scanline {
+  opacity: 0.5;
+  height: 3px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--accent-cardio) 60%, transparent),
+    transparent
+  );
+  animation: scanline-sweep 7s linear infinite;
+}
+[data-theme="neon-static"] .fx-flicker {
+  opacity: 1;
+  background: var(--bg);
+  animation: crt-flicker 9s ease-in-out infinite;
+}
+@keyframes scanline-sweep {
+  0% { transform: translateY(-10%); }
+  100% { transform: translateY(110vh); }
+}
+@keyframes crt-flicker {
+  0%, 96%, 100% { opacity: 0; }
+  97% { opacity: 0.04; }
+  98% { opacity: 0; }
+  98.5% { opacity: 0.03; }
+}
+
+/* ---- Gotham Watch: searchlight sweep + vignette fog ---- */
+[data-theme="gotham-watch"] .fx-vignette {
+  opacity: 1;
+  background: radial-gradient(ellipse 80% 60% at 50% 40%, transparent 0%, color-mix(in srgb, black 55%, transparent) 100%);
+}
+[data-theme="gotham-watch"] .fx-spotlight {
+  opacity: 0.5;
+  width: 140vmax;
+  height: 140vmax;
+  left: 50%;
+  top: -110vmax;
+  background: conic-gradient(
+    from 210deg at 50% 100%,
+    transparent 0deg,
+    color-mix(in srgb, var(--accent-highlight) 10%, transparent) 8deg,
+    transparent 16deg,
+    transparent 360deg
+  );
+  animation: searchlight-sweep 22s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+@keyframes searchlight-sweep {
+  0%, 100% { transform: translateX(-50%) rotate(-35deg); }
+  50% { transform: translateX(-50%) rotate(35deg); }
+}
+
+/* ---- Glacier Drift: drifting aurora wash ---- */
+[data-theme="glacier-drift"] .fx-aurora {
+  opacity: 1;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 20%, color-mix(in srgb, var(--accent-cardio) 16%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 35% at 80% 30%, color-mix(in srgb, var(--accent-highlight) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 45% at 50% 85%, color-mix(in srgb, var(--accent-strength) 10%, transparent) 0%, transparent 60%);
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-2%, 2%) scale(1.08); }
+  100% { transform: translate(2%, -1%) scale(1.03); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-scanline, .fx-flicker, .fx-spotlight, .fx-aurora {
+    animation: none !important;
+  }
+}
+/* Background motion is decorative and can be genuinely heavy on low-end
+   phones over a full viewport — pause it on small screens, keep the
+   static texture layers (grain/grid/vignette/aurora base) as-is. */
+@media (max-width: 640px) {
+  .fx-scanline, .fx-spotlight, .fx-aurora, .fx-flicker {
+    animation-play-state: paused;
+  }
+}
+
+/* ================= Per-theme component flourishes ================= */
+
+/* Graphite Rust: flat fills (no gradient), an editorial rule that slides
+   in on hover instead of a glow — matches its deliberately calm identity. */
+[data-theme="graphite-rust"] .btn-primary {
+  background-image: none;
+  background-color: var(--accent-strength);
+}
+[data-theme="graphite-rust"] .card-interactive {
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="graphite-rust"] .card-interactive::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-strength);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 220ms ease;
+}
+[data-theme="graphite-rust"] .card-interactive:hover::before {
+  transform: scaleY(1);
+}
+
+/* Neon Static: uppercase tracking on display text and buttons, a quick
+   chromatic-aberration style glitch nudge on interactive hover. */
+[data-theme="neon-static"] .font-display {
+  letter-spacing: 0.04em;
+}
+[data-theme="neon-static"] button {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+[data-theme="neon-static"] .card-interactive:hover {
+  animation: glitch-nudge 260ms steps(2, jump-none);
+}
+@keyframes glitch-nudge {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-1px, 1px); }
+  40% { transform: translate(1px, -1px); }
+  60% { transform: translate(-1px, 0); }
+  80% { transform: translate(1px, 0); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Gotham Watch: tall condensed display type, a slow gold flash on hover
+   instead of a constant glow (mirrors a searchlight catching something). */
+[data-theme="gotham-watch"] .font-display {
+  letter-spacing: 0.06em;
+  font-weight: 400;
+}
+[data-theme="gotham-watch"] .card-interactive:hover {
+  animation: signal-flash 900ms ease-out;
+}
+@keyframes signal-flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-highlight) 0%, transparent); }
+  30% { box-shadow: 0 0 24px 2px color-mix(in srgb, var(--accent-highlight) 35%, transparent); }
+  100% { box-shadow: var(--glow-soft); }
+}
+
+/* Glacier Drift: a soft light sweep across the glass on hover, like light
+   catching an ice facet. */
+[data-theme="glacier-drift"] .card-interactive {
+  position: relative;
+  overflow: hidden;
+}
+[data-theme="glacier-drift"] .card-interactive::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, color-mix(in srgb, white 14%, transparent) 45%, transparent 60%);
+  transform: translateX(-120%);
+  transition: transform 600ms ease;
+}
+[data-theme="glacier-drift"] .card-interactive:hover::after {
+  transform: translateX(120%);
+}
+
+::selection {
+  background-color: var(--accent-strength);
+  color: var(--bg);
+}
+
+/* Respect reduced-motion preferences globally */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Visible keyboard focus ring using the current theme's strength accent */
+:focus-visible {
+  outline: 2px solid var(--accent-strength);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Motion system ----------
+   A small, deliberate set: page entrance, a tooltip pop, a streak flicker
+   tied to real data, and a rest-timer urgency pulse. Nothing scattered. */
+
+@keyframes tooltip-pop {
+  from { opacity: 0; transform: scale(0.96) translateY(2px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.tooltip-pop { animation: tooltip-pop 120ms ease-out; }
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-in { animation: page-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.stagger-in { animation: stagger-in 400ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Flame flicker — only meaningful when there's an actual streak to show,
+   so this is applied conditionally in the component, not globally. */
+@keyframes flame-flicker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  25% { opacity: 0.85; transform: scale(0.96) rotate(-2deg); }
+  50% { opacity: 1; transform: scale(1.04) rotate(1deg); }
+  75% { opacity: 0.9; transform: scale(0.98) rotate(-1deg); }
+}
+.flame-active { animation: flame-flicker 2.4s ease-in-out infinite; }
+
+/* Rest-timer urgency — kicks in only under 10s, applied conditionally. */
+@keyframes urgent-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-danger) 50%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent-danger) 0%, transparent); }
+}
+.timer-urgent { animation: urgent-pulse 1s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in, .stagger-in, .flame-active, .timer-urgent, .tooltip-pop {
+    animation: none;
+  }
+}

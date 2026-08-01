@@ -1,0 +1,44 @@
+
+services:
+  app:
+    # Built and tagged by deploy/patch.sh (or deploy/setup.sh for the very
+    # first deploy) as iron-ledger:<git-sha> — IMAGE_TAG in .env points at
+    # whichever one is currently live. Rolling back is just changing this
+    # value and restarting; it never needs a rebuild.
+    image: iron-ledger:${IMAGE_TAG:-latest}
+    container_name: iron_ledger_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://iron_ledger:${POSTGRES_PASSWORD}@postgres:5432/iron_ledger
+    # Bound to localhost only — Nginx on the host proxies to this port.
+    # Change if this collides with something else already running on the VM.
+    ports:
+      - "127.0.0.1:3101:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: iron_ledger_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: iron_ledger
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: iron_ledger
+    # No published port — only reachable from the app container over the
+    # private compose network. This is the "separate, isolated database"
+    # half of the setup; nothing outside this compose project can see it,
+    # including anything Muskaan Travels runs on the same VM.
+    volumes:
+      - iron_ledger_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iron_ledger"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  iron_ledger_pg_data:
