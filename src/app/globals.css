@@ -180,6 +180,12 @@ html {
 body {
   color: var(--text);
   font-family: var(--font-sans);
+  /* Belt-and-suspenders: nothing in this app is meant to scroll
+     horizontally at the page level (unlike an individual widget's own
+     `overflow-x-auto`, which is unaffected by this). If some future bit of
+     unwrapped content ever runs wider than the viewport, this clips it
+     instead of letting the whole page grow scrollable sideways. */
+  overflow-x: hidden;
 }
 
 /* ================= Background FX layer =================

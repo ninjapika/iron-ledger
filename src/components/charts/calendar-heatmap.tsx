@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dumbbell, Footprints, Sparkles } from "lucide-react";
 import type { MonthActivity } from "@/lib/data/dashboard";
 import { dominantWorkoutType } from "@/lib/data/workout-types";
@@ -35,38 +35,70 @@ const LEGEND = [
 
 const COLS = 7;
 
-function DayCell({
-  dayNum,
-  lvl,
-  bg,
-  isToday,
-  showLabel,
-  title,
-  cellSize,
-}: {
+type DayInfo = {
+  date: string;
   dayNum: number;
   lvl: 0 | 1 | 2 | 3;
   bg: string;
   isToday: boolean;
   showLabel: boolean;
   title: string;
-  cellSize: number;
-}) {
+};
+
+/**
+ * `size="fill"` makes the cell (and its aspect ratio) take on whatever
+ * width its flex parent gives it instead of a fixed pixel value — used by
+ * the `mini` variant's balanced-row layout below, where every row's cells
+ * are meant to stretch evenly to fill that row's actual width.
+ */
+function DayCell({ day, size }: { day: DayInfo; size: number | "fill" }) {
+  const boxStyle: React.CSSProperties =
+    size === "fill"
+      ? { width: "100%", aspectRatio: "1 / 1", backgroundColor: day.bg, opacity: OPACITY[day.lvl] }
+      : { width: size, height: size, backgroundColor: day.bg, opacity: OPACITY[day.lvl] };
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className={cn("flex flex-col items-center gap-0.5", size === "fill" && "flex-1")}>
       <div
-        title={title}
-        style={{ width: cellSize, height: cellSize, backgroundColor: bg, opacity: OPACITY[lvl] }}
-        className={cn("rounded-[3px]", isToday && "ring-1 ring-accent-highlight ring-offset-1 ring-offset-bg")}
+        title={day.title}
+        style={boxStyle}
+        className={cn("rounded-[3px]", day.isToday && "ring-1 ring-accent-highlight ring-offset-1 ring-offset-bg")}
       />
       <span
         className="text-[8px] leading-none text-text-muted"
-        style={{ visibility: showLabel ? "visible" : "hidden" }}
+        style={{ visibility: day.showLabel ? "visible" : "hidden" }}
       >
-        {dayNum}
+        {day.dayNum}
       </span>
     </div>
   );
+}
+
+/**
+ * Splits `days` into balanced rows sized to actually fill `containerWidth`:
+ * first works out how many `minCell`-ish cells fit per line at that width,
+ * then — instead of just wrapping greedily at that count (which leaves a
+ * lopsided short last row that `justify-content` would otherwise stretch
+ * out into big, ugly gaps between its few cells) — picks the smallest
+ * number of EQUAL-ish rows that keeps every row at or under that count.
+ * "Equal-ish" means no two rows ever differ by more than one cell, so cell
+ * size stays visually consistent from row to row.
+ */
+function balancedRows(days: DayInfo[], containerWidth: number, minCell: number, gap: number): DayInfo[][] {
+  const total = days.length;
+  if (total === 0) return [];
+  const perRowAtMinSize = containerWidth > 0 ? Math.max(1, Math.floor((containerWidth + gap) / (minCell + gap))) : 10;
+  const numRows = Math.max(1, Math.ceil(total / perRowAtMinSize));
+  const base = Math.floor(total / numRows);
+  const remainder = total % numRows;
+
+  const rows: DayInfo[][] = [];
+  let idx = 0;
+  for (let r = 0; r < numRows; r++) {
+    const count = base + (r < remainder ? 1 : 0);
+    rows.push(days.slice(idx, idx + count));
+    idx += count;
+  }
+  return rows;
 }
 
 /**
@@ -80,14 +112,11 @@ function DayCell({
  *   small squarish block regardless of container width.
  *
  * - `variant="mini"` (the dashboard card): fills whatever width its parent
- *   actually gives it instead of shrinking to that same fixed block — a
- *   `flex-wrap` row of fixed-size cells with `justify-content: space-between`.
- *   The browser fits as many cells as the real available width allows per
- *   line (no JS measurement, fully responsive) and spreads whatever ends up
- *   on each line edge-to-edge, so every row — including a ragged last one —
- *   uses the full width with no dead trailing space, and cell size stays
- *   consistent across rows instead of one sparse row ballooning to fill
- *   itself alone.
+ *   actually gives it, in balanced rows (see balancedRows above) — each row
+ *   is its own flex line whose cells stretch evenly to fill it, so the
+ *   whole block reads as one consistent, evenly-spaced grid that uses the
+ *   full width with no dead trailing space, rather than a fixed tiny block
+ *   or a lopsided wrap.
  *
  * Each cell is colored by whichever workout type contributed the most that
  * day (strength/cardio/skill — see dominantWorkoutType), shaded by relative
@@ -109,37 +138,46 @@ export function CalendarHeatmap({
   const labeledDays = useMemo(() => {
     // Every 7th day (1, 8, 15, 22, 29) plus the last day of the month —
     // under `variant="labeled"`'s fixed 7-column grid these line up with
-    // the start of each row; under `variant="mini"`'s flexible wrap they no
-    // longer necessarily do, but they're still a reasonable, evenly-spaced
-    // set of reference points either way.
+    // the start of each row; under `variant="mini"`'s balanced rows they
+    // no longer necessarily do, but they're still a reasonable, evenly
+    // spaced set of reference points either way.
     const marks = new Set<number>();
     for (let d = 1; d <= totalDays; d += 7) marks.add(d);
     marks.add(totalDays);
     return marks;
   }, [totalDays]);
 
-  const cellSize = variant === "mini" ? 12 : 11;
-  const gap = 4;
+  const cellSize = variant === "mini" ? 14 : 11;
+  const gap = 5;
 
-  const cells = data.days.map((day, i) => {
+  const days: DayInfo[] = data.days.map((day, i) => {
     const dayNum = i + 1;
     const lvl = intensity(day.load, max);
-    const isToday = day.date === todayKey;
     const dominant = dominantWorkoutType(day);
-    const bg = lvl === 0 ? "var(--surface-2)" : dominant ? TYPE_VAR[dominant] : "var(--type-manual)";
-    return (
-      <DayCell
-        key={day.date}
-        dayNum={dayNum}
-        lvl={lvl}
-        bg={bg}
-        isToday={isToday}
-        showLabel={labeledDays.has(dayNum)}
-        title={day.date + (day.load > 0 ? ` — ${dominant ?? "logged"}` : "")}
-        cellSize={cellSize}
-      />
-    );
+    return {
+      date: day.date,
+      dayNum,
+      lvl,
+      bg: lvl === 0 ? "var(--surface-2)" : dominant ? TYPE_VAR[dominant] : "var(--type-manual)",
+      isToday: day.date === todayKey,
+      showLabel: labeledDays.has(dayNum),
+      title: day.date + (day.load > 0 ? ` — ${dominant ?? "logged"}` : ""),
+    };
   });
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (variant !== "mini") return;
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => setWidth(entries[0].contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [variant]);
+
+  const rows = variant === "mini" ? balancedRows(days, width, cellSize, gap) : [];
 
   return (
     <div>
@@ -150,15 +188,23 @@ export function CalendarHeatmap({
       )}
 
       {variant === "mini" ? (
-        <div className="flex w-full flex-wrap justify-between" style={{ gap }}>
-          {cells}
+        <div ref={containerRef} className="flex w-full flex-col" style={{ gap }}>
+          {rows.map((row, i) => (
+            <div key={i} className="flex" style={{ gap }}>
+              {row.map((day) => (
+                <DayCell key={day.date} day={day} size="fill" />
+              ))}
+            </div>
+          ))}
         </div>
       ) : (
         <div
           className="inline-grid"
           style={{ gridTemplateColumns: `repeat(${COLS}, minmax(${cellSize}px, auto))`, gap }}
         >
-          {cells}
+          {days.map((day) => (
+            <DayCell key={day.date} day={day} size={cellSize} />
+          ))}
         </div>
       )}
 

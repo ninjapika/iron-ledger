@@ -18,7 +18,7 @@ export default async function HistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-2xl uppercase tracking-wide">Workout History</h1>
         <div className="flex gap-2">
           <Link
