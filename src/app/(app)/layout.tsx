@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="app-shell flex min-h-screen">
       <TimezoneSync storedTimezone={user.settings.timezone} />
       <Sidebar displayName={name} />
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="min-w-0 flex-1 pb-20 md:pb-0">
         <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
           <PageTransition>{children}</PageTransition>
         </div>
