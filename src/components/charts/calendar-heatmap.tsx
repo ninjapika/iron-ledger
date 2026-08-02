@@ -35,22 +35,65 @@ const LEGEND = [
 
 const COLS = 7;
 
+function DayCell({
+  dayNum,
+  lvl,
+  bg,
+  isToday,
+  showLabel,
+  title,
+  cellSize,
+}: {
+  dayNum: number;
+  lvl: 0 | 1 | 2 | 3;
+  bg: string;
+  isToday: boolean;
+  showLabel: boolean;
+  title: string;
+  cellSize: number;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div
+        title={title}
+        style={{ width: cellSize, height: cellSize, backgroundColor: bg, opacity: OPACITY[lvl] }}
+        className={cn("rounded-[3px]", isToday && "ring-1 ring-accent-highlight ring-offset-1 ring-offset-bg")}
+      />
+      <span
+        className="text-[8px] leading-none text-text-muted"
+        style={{ visibility: showLabel ? "visible" : "hidden" }}
+      >
+        {dayNum}
+      </span>
+    </div>
+  );
+}
+
 /**
- * A compact, fixed-column grid of day cells — day 1 through the end of the
- * month, left to right then wrapping every 7 (a plain `display: grid` with
- * `repeat(7, ...)` columns and no explicit placement, so the browser
- * auto-wraps every item deterministically). Deliberately NOT aligned to
- * actual weekdays — this is a fixed grid, not a real calendar, so it always
- * reads as a small squarish block regardless of container width instead of
- * stretching into one long row.
+ * Two rendering strategies depending on `variant`, both built from the same
+ * per-day DayCell:
+ *
+ * - `variant="labeled"` (the full history/calendar page): a fixed 7-column
+ *   grid, day 1 through the end of the month, left to right then wrapping
+ *   every 7 (`display: grid` with `repeat(7, ...)` and no explicit
+ *   placement). Deliberately NOT aligned to actual weekdays — always a
+ *   small squarish block regardless of container width.
+ *
+ * - `variant="mini"` (the dashboard card): fills whatever width its parent
+ *   actually gives it instead of shrinking to that same fixed block — a
+ *   `flex-wrap` row of fixed-size cells with `justify-content: space-between`.
+ *   The browser fits as many cells as the real available width allows per
+ *   line (no JS measurement, fully responsive) and spreads whatever ends up
+ *   on each line edge-to-edge, so every row — including a ragged last one —
+ *   uses the full width with no dead trailing space, and cell size stays
+ *   consistent across rows instead of one sparse row ballooning to fill
+ *   itself alone.
  *
  * Each cell is colored by whichever workout type contributed the most that
  * day (strength/cardio/skill — see dominantWorkoutType), shaded by relative
  * intensity; an empty day is just the flat surface color. Only a sparse
  * handful of days ever print a number, directly under their own cell (never
- * a full weekday-style header) — `variant="mini"` (dashboard) keeps just
- * the first/last day, `variant="labeled"` (the full history gallery) adds a
- * couple more and shows the type legend underneath.
+ * a full weekday-style header).
  */
 export function CalendarHeatmap({
   data,
@@ -64,17 +107,39 @@ export function CalendarHeatmap({
   const totalDays = data.days.length;
 
   const labeledDays = useMemo(() => {
-    // Every 7th day lines up with the start of a new row in the grid
-    // (day 1, 8, 15, 22, 29 all land in column 1), so these read as
-    // natural row markers rather than looking randomly placed.
+    // Every 7th day (1, 8, 15, 22, 29) plus the last day of the month —
+    // under `variant="labeled"`'s fixed 7-column grid these line up with
+    // the start of each row; under `variant="mini"`'s flexible wrap they no
+    // longer necessarily do, but they're still a reasonable, evenly-spaced
+    // set of reference points either way.
     const marks = new Set<number>();
     for (let d = 1; d <= totalDays; d += 7) marks.add(d);
     marks.add(totalDays);
     return marks;
   }, [totalDays]);
 
-  const cellSize = variant === "mini" ? 8 : 11;
-  const gap = variant === "mini" ? 3 : 4;
+  const cellSize = variant === "mini" ? 12 : 11;
+  const gap = 4;
+
+  const cells = data.days.map((day, i) => {
+    const dayNum = i + 1;
+    const lvl = intensity(day.load, max);
+    const isToday = day.date === todayKey;
+    const dominant = dominantWorkoutType(day);
+    const bg = lvl === 0 ? "var(--surface-2)" : dominant ? TYPE_VAR[dominant] : "var(--type-manual)";
+    return (
+      <DayCell
+        key={day.date}
+        dayNum={dayNum}
+        lvl={lvl}
+        bg={bg}
+        isToday={isToday}
+        showLabel={labeledDays.has(dayNum)}
+        title={day.date + (day.load > 0 ? ` — ${dominant ?? "logged"}` : "")}
+        cellSize={cellSize}
+      />
+    );
+  });
 
   return (
     <div>
@@ -84,34 +149,18 @@ export function CalendarHeatmap({
         </p>
       )}
 
-      <div
-        className="inline-grid"
-        style={{ gridTemplateColumns: `repeat(${COLS}, minmax(${cellSize}px, auto))`, gap }}
-      >
-        {data.days.map((day, i) => {
-          const dayNum = i + 1;
-          const lvl = intensity(day.load, max);
-          const isToday = day.date === todayKey;
-          const dominant = dominantWorkoutType(day);
-          const bg = lvl === 0 ? "var(--surface-2)" : dominant ? TYPE_VAR[dominant] : "var(--type-manual)";
-          const showLabel = labeledDays.has(dayNum);
-          return (
-            <div key={day.date} className="flex flex-col items-center gap-0.5">
-              <div
-                title={day.date + (day.load > 0 ? ` — ${dominant ?? "logged"}` : "")}
-                style={{ width: cellSize, height: cellSize, backgroundColor: bg, opacity: OPACITY[lvl] }}
-                className={cn("rounded-[3px]", isToday && "ring-1 ring-accent-highlight ring-offset-1 ring-offset-bg")}
-              />
-              <span
-                className="text-[8px] leading-none text-text-muted"
-                style={{ visibility: showLabel ? "visible" : "hidden" }}
-              >
-                {dayNum}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      {variant === "mini" ? (
+        <div className="flex w-full flex-wrap justify-between" style={{ gap }}>
+          {cells}
+        </div>
+      ) : (
+        <div
+          className="inline-grid"
+          style={{ gridTemplateColumns: `repeat(${COLS}, minmax(${cellSize}px, auto))`, gap }}
+        >
+          {cells}
+        </div>
+      )}
 
       {variant === "labeled" && (
         <div className="mt-2 flex flex-wrap items-center gap-3 text-[10px] text-text-muted">
