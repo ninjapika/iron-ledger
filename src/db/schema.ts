@@ -186,7 +186,7 @@ export const bodyMetrics = pgTable(
   (t) => [index("body_metrics_user_date_idx").on(t.userId, t.date)]
 );
 
-// ---------- Programs (DAREBEE-imported or self-curated) ----------
+// ---------- Programs (self-curated; may also hold already-imported legacy programs) ----------
 
 export const programs = pgTable("programs", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -216,7 +216,7 @@ export const programExercises = pgTable("program_exercises", {
   id: uuid("id").defaultRandom().primaryKey(),
   dayId: uuid("day_id").notNull().references(() => programDays.id, { onDelete: "cascade" }),
   exerciseId: uuid("exercise_id").references(() => exercises.id),
-  freeText: text("free_text"), // raw name from an AI-parsed PDF, pre-matching
+  freeText: text("free_text"), // raw name from an already-imported legacy program, pre-matching
   sets: integer("sets"),
   reps: text("reps"), // "12" | "AMRAP" | "30s" — all valid
   durationSec: integer("duration_sec"),

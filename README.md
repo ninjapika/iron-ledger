@@ -2,7 +2,7 @@
 
 A private strength, cardio, and program tracker — built for a home setup
 with adjustable dumbbells, a barbell, an EZ curl bar, and a resistance band,
-with DAREBEE program import and a from-scratch program builder.
+with a from-scratch program builder.
 
 This is a single-owner app: whoever signs up first becomes the only account
 that can ever exist on a given instance. There's no multi-user support and
@@ -68,11 +68,6 @@ weight, plates, EZ bar weight — the band defaults to 40–60kg already).
   run down and confirm the beep/vibration fires
 - Log a completed workout after the fact
 - Build a custom program, then start a workout from one of its days
-- **DAREBEE import** — this needs a real key. Get a free one at
-  https://aistudio.google.com/apikey, put it in `GEMINI_API_KEY` in `.env`,
-  restart `npm run dev`, and upload an actual program PDF. Extraction
-  quality depends on how the PDF is laid out — if it mis-reads something,
-  tell me what it got wrong and I'll adjust the prompt.
 - Log a cardio session and a body-metric entry, check they show up on
   the dashboard charts
 - Try each theme preset and the auto-rotate toggle in Settings
@@ -115,7 +110,6 @@ nano .env
 Fill in:
 - `POSTGRES_PASSWORD` — a real random value
 - `SESSION_SECRET` — `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
-- `GEMINI_API_KEY` — your key from https://aistudio.google.com/apikey
 - Leave `DATABASE_URL` alone — `docker-compose.yml` builds it automatically
   from `POSTGRES_PASSWORD` for the production container
 
@@ -194,12 +188,10 @@ docker compose exec postgres pg_dump -U iron_ledger iron_ledger > backup-$(date 
 src/
   app/(auth)/             login, signup
   app/(app)/              dashboard, log, programs, cardio, body, exercises, settings
-  app/api/programs/parse  DAREBEE PDF -> Gemini -> structured JSON
   components/             ui primitives, charts, workout/program/cardio/body forms
   lib/actions/            server actions (the actual mutations)
   lib/data/                read-only query helpers for pages
   lib/auth/                password hashing, JWT sessions, current-user helper
-  lib/ai/gemini.ts         the DAREBEE PDF parser
   db/schema.ts             the whole data model
 scripts/smoke-test.ts      direct DB smoke test, no HTTP needed
 deploy/                    Nginx config for the VPS
@@ -207,9 +199,6 @@ deploy/                    Nginx config for the VPS
 
 ## Known rough edges / good next steps
 
-- DAREBEE import review lets you edit day titles/type and remove bad days,
-  but not individual exercise fields yet — worth adding if the AI
-  extraction needs frequent per-exercise correction.
 - No "sign out other devices" UI yet, though the DB has an audit table
   (`sessions`) ready for it.
 - Progressive-overload suggestions ("try 22.5kg today") aren't built —

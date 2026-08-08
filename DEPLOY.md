@@ -19,7 +19,7 @@ was, with no half-applied state left behind.
 git clone <your-repo-url> /opt/iron-ledger   # or however you prefer to get the code on there
 cd /opt/iron-ledger
 cp .env.example .env
-nano .env   # fill in POSTGRES_PASSWORD, SESSION_SECRET, GEMINI_API_KEY — see .env.example for how
+nano .env   # fill in POSTGRES_PASSWORD, SESSION_SECRET — see .env.example for how
 
 ./deploy/setup.sh
 ```

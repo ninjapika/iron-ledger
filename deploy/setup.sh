@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 source deploy/lib.sh
 
-require_file ".env" "Copy .env.example to .env and fill in POSTGRES_PASSWORD, SESSION_SECRET, and GEMINI_API_KEY first (see server.md Part 2, step 2)."
+require_file ".env" "Copy .env.example to .env and fill in POSTGRES_PASSWORD and SESSION_SECRET first (see server.md Part 2, step 2)."
 require_clean_git
 
 if ! command -v docker >/dev/null; then

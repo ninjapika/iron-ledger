@@ -118,7 +118,7 @@ async function main() {
   const customDayExercises = await db.select().from(programExercises).where(eq(programExercises.dayId, day.id));
   assert(customDayExercises[0]?.exerciseId === benchPress.id, "custom program exercise links to catalog");
 
-  console.log("AI-import-shaped program (freeText, rounds):");
+  console.log("Legacy freeText-shaped program (already-imported data, rounds):");
   const [imported] = await db
     .insert(programs)
     .values({ userId, name: "Imported Test", source: "darebee", sourcePdfName: "test.pdf" })
@@ -129,12 +129,12 @@ async function main() {
     .returning();
   await db.insert(programExercises).values({ dayId: importedDay.id, freeText: "Push-ups", rounds: 3, reps: "15", orderIndex: 0 });
   const importedExercises = await db.select().from(programExercises).where(eq(programExercises.dayId, importedDay.id));
-  assert(importedExercises[0]?.freeText === "Push-ups" && importedExercises[0]?.rounds === 3, "AI-shaped exercise persisted");
+  assert(importedExercises[0]?.freeText === "Push-ups" && importedExercises[0]?.rounds === 3, "freeText-shaped exercise persisted");
 
   console.log("Cardio session linked to a program:");
   const [cardio] = await db
     .insert(cardioSessions)
-    .values({ userId, type: "darebee_cardio", distanceKm: 5, durationSec: 1500, avgPaceSecKm: 300, programId: imported.id })
+    .values({ userId, type: "outdoor_run", distanceKm: 5, durationSec: 1500, avgPaceSecKm: 300, programId: imported.id })
     .returning();
   assert(cardio.programId === imported.id, "cardio session links to its program");
 

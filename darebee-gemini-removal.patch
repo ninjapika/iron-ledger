@@ -1,0 +1,1302 @@
+diff --git a/DEPLOY.md b/DEPLOY.md
+index e9cfc13..03f517f 100644
+--- a/DEPLOY.md
++++ b/DEPLOY.md
+@@ -19,7 +19,7 @@ was, with no half-applied state left behind.
+ git clone <your-repo-url> /opt/iron-ledger   # or however you prefer to get the code on there
+ cd /opt/iron-ledger
+ cp .env.example .env
+-nano .env   # fill in POSTGRES_PASSWORD, SESSION_SECRET, GEMINI_API_KEY — see .env.example for how
++nano .env   # fill in POSTGRES_PASSWORD, SESSION_SECRET — see .env.example for how
+ 
+ ./deploy/setup.sh
+ ```
+diff --git a/README.md b/README.md
+index da2239f..eddd657 100644
+--- a/README.md
++++ b/README.md
+@@ -2,7 +2,7 @@
+ 
+ A private strength, cardio, and program tracker — built for a home setup
+ with adjustable dumbbells, a barbell, an EZ curl bar, and a resistance band,
+-with DAREBEE program import and a from-scratch program builder.
++with a from-scratch program builder.
+ 
+ This is a single-owner app: whoever signs up first becomes the only account
+ that can ever exist on a given instance. There's no multi-user support and
+@@ -68,11 +68,6 @@ weight, plates, EZ bar weight — the band defaults to 40–60kg already).
+   run down and confirm the beep/vibration fires
+ - Log a completed workout after the fact
+ - Build a custom program, then start a workout from one of its days
+-- **DAREBEE import** — this needs a real key. Get a free one at
+-  https://aistudio.google.com/apikey, put it in `GEMINI_API_KEY` in `.env`,
+-  restart `npm run dev`, and upload an actual program PDF. Extraction
+-  quality depends on how the PDF is laid out — if it mis-reads something,
+-  tell me what it got wrong and I'll adjust the prompt.
+ - Log a cardio session and a body-metric entry, check they show up on
+   the dashboard charts
+ - Try each theme preset and the auto-rotate toggle in Settings
+@@ -115,7 +110,6 @@ nano .env
+ Fill in:
+ - `POSTGRES_PASSWORD` — a real random value
+ - `SESSION_SECRET` — `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+-- `GEMINI_API_KEY` — your key from https://aistudio.google.com/apikey
+ - Leave `DATABASE_URL` alone — `docker-compose.yml` builds it automatically
+   from `POSTGRES_PASSWORD` for the production container
+ 
+@@ -194,12 +188,10 @@ docker compose exec postgres pg_dump -U iron_ledger iron_ledger > backup-$(date
+ src/
+   app/(auth)/             login, signup
+   app/(app)/              dashboard, log, programs, cardio, body, exercises, settings
+-  app/api/programs/parse  DAREBEE PDF -> Gemini -> structured JSON
+   components/             ui primitives, charts, workout/program/cardio/body forms
+   lib/actions/            server actions (the actual mutations)
+   lib/data/                read-only query helpers for pages
+   lib/auth/                password hashing, JWT sessions, current-user helper
+-  lib/ai/gemini.ts         the DAREBEE PDF parser
+   db/schema.ts             the whole data model
+ scripts/smoke-test.ts      direct DB smoke test, no HTTP needed
+ deploy/                    Nginx config for the VPS
+@@ -207,9 +199,6 @@ deploy/                    Nginx config for the VPS
+ 
+ ## Known rough edges / good next steps
+ 
+-- DAREBEE import review lets you edit day titles/type and remove bad days,
+-  but not individual exercise fields yet — worth adding if the AI
+-  extraction needs frequent per-exercise correction.
+ - No "sign out other devices" UI yet, though the DB has an audit table
+   (`sessions`) ready for it.
+ - Progressive-overload suggestions ("try 22.5kg today") aren't built —
+diff --git a/deploy/nginx-iron-ledger.conf b/deploy/nginx-iron-ledger.conf
+index 4ff972e..8dd4adf 100644
+--- a/deploy/nginx-iron-ledger.conf
++++ b/deploy/nginx-iron-ledger.conf
+@@ -23,9 +23,5 @@ server {
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_set_header X-Forwarded-Proto $scheme;
+-
+-        # DAREBEE PDF uploads + Gemini parsing can take a little while.
+-        proxy_read_timeout 75s;
+-        client_max_body_size 20m;
+     }
+ }
+diff --git a/deploy/setup.sh b/deploy/setup.sh
+index 2414629..3d63af7 100755
+--- a/deploy/setup.sh
++++ b/deploy/setup.sh
+@@ -6,7 +6,7 @@ set -euo pipefail
+ cd "$(dirname "${BASH_SOURCE[0]}")/.."
+ source deploy/lib.sh
+ 
+-require_file ".env" "Copy .env.example to .env and fill in POSTGRES_PASSWORD, SESSION_SECRET, and GEMINI_API_KEY first (see server.md Part 2, step 2)."
++require_file ".env" "Copy .env.example to .env and fill in POSTGRES_PASSWORD and SESSION_SECRET first (see server.md Part 2, step 2)."
+ require_clean_git
+ 
+ if ! command -v docker >/dev/null; then
+diff --git a/package-lock.json b/package-lock.json
+index a5da651..8746262 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -13,7 +13,6 @@
+         "@fontsource/ibm-plex-mono": "^5.3.0",
+         "@fontsource/manrope": "^5.3.0",
+         "@fontsource/orbitron": "^5.3.0",
+-        "@google/genai": "^2.13.0",
+         "bcryptjs": "^3.0.3",
+         "clsx": "^2.1.1",
+         "date-fns": "^4.4.0",
+@@ -1404,30 +1403,6 @@
+         "url": "https://github.com/sponsors/ayuhito"
+       }
+     },
+-    "node_modules/@google/genai": {
+-      "version": "2.13.0",
+-      "resolved": "https://registry.npmjs.org/@google/genai/-/genai-2.13.0.tgz",
+-      "integrity": "sha512-GM7C8Kaomvjz05x5JEO6+l3d/pciL9LxAG9dUjJLD7nTPZ9X0Cfsf2Z7eET6UjgWyUmxXCHtYnQoQ77F9+ZIOQ==",
+-      "hasInstallScript": true,
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "google-auth-library": "^10.3.0",
+-        "p-retry": "^4.6.2",
+-        "protobufjs": "^7.5.4",
+-        "ws": "^8.18.0"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      },
+-      "peerDependencies": {
+-        "@modelcontextprotocol/sdk": "^1.25.2"
+-      },
+-      "peerDependenciesMeta": {
+-        "@modelcontextprotocol/sdk": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/@humanfs/core": {
+       "version": "0.19.2",
+       "resolved": "https://registry.npmjs.org/@humanfs/core/-/core-0.19.2.tgz",
+@@ -2221,63 +2196,6 @@
+         "node": ">=12.4.0"
+       }
+     },
+-    "node_modules/@protobufjs/aspromise": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/aspromise/-/aspromise-1.1.2.tgz",
+-      "integrity": "sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/base64": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/base64/-/base64-1.1.2.tgz",
+-      "integrity": "sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/codegen": {
+-      "version": "2.0.5",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/codegen/-/codegen-2.0.5.tgz",
+-      "integrity": "sha512-zgXFLzW3Ap33e6d0Wlj4MGIm6Ce8O89n/apUaGNB/jx+hw+ruWEp7EwGUshdLKVRCxZW12fp9r40E1mQrf/34g==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/eventemitter": {
+-      "version": "1.1.1",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/eventemitter/-/eventemitter-1.1.1.tgz",
+-      "integrity": "sha512-vW1GmwMZNnL+gMRaovlh9yZX74kc+TTU3FObkkurpMaRtBfLP3ldjS9KQWlwZgraRE0+dheEEoAxdzcJQ8eXZg==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/fetch": {
+-      "version": "1.1.1",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/fetch/-/fetch-1.1.1.tgz",
+-      "integrity": "sha512-GpptLrs57adMSuHi3VNj0mAF8dwh36LMaYF6XyJ6JMWlVsc+t42tm1HSEDmOs3A8fC9yyeisgLhsTVQokOZ0zw==",
+-      "license": "BSD-3-Clause",
+-      "dependencies": {
+-        "@protobufjs/aspromise": "^1.1.1"
+-      }
+-    },
+-    "node_modules/@protobufjs/float": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/float/-/float-1.0.2.tgz",
+-      "integrity": "sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/path": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/path/-/path-1.1.2.tgz",
+-      "integrity": "sha512-6JOcJ5Tm08dOHAbdR3GrvP+yUUfkjG5ePsHYczMFLq3ZmMkAD98cDgcT2iA1lJ9NVwFd4tH/iSSoe44YWkltEA==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/pool": {
+-      "version": "1.1.0",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/pool/-/pool-1.1.0.tgz",
+-      "integrity": "sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/@protobufjs/utf8": {
+-      "version": "1.1.2",
+-      "resolved": "https://registry.npmjs.org/@protobufjs/utf8/-/utf8-1.1.2.tgz",
+-      "integrity": "sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==",
+-      "license": "BSD-3-Clause"
+-    },
+     "node_modules/@reduxjs/toolkit": {
+       "version": "2.12.0",
+       "resolved": "https://registry.npmjs.org/@reduxjs/toolkit/-/toolkit-2.12.0.tgz",
+@@ -2709,6 +2627,7 @@
+       "version": "20.19.43",
+       "resolved": "https://registry.npmjs.org/@types/node/-/node-20.19.43.tgz",
+       "integrity": "sha512-6oYBAi5ikg4Pl+kGsoYtawUMBT2zZMCvPNF7pVLnHZfd1zf38DRiWn/gT01RYCdUqkv7Fhr+C9ot4/tb+2sVvA==",
++      "devOptional": true,
+       "license": "MIT",
+       "dependencies": {
+         "undici-types": "~6.21.0"
+@@ -2746,12 +2665,6 @@
+         "@types/react": "^19.2.0"
+       }
+     },
+-    "node_modules/@types/retry": {
+-      "version": "0.12.0",
+-      "resolved": "https://registry.npmjs.org/@types/retry/-/retry-0.12.0.tgz",
+-      "integrity": "sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==",
+-      "license": "MIT"
+-    },
+     "node_modules/@types/use-sync-external-store": {
+       "version": "0.0.6",
+       "resolved": "https://registry.npmjs.org/@types/use-sync-external-store/-/use-sync-external-store-0.0.6.tgz",
+@@ -3400,15 +3313,6 @@
+         "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0"
+       }
+     },
+-    "node_modules/agent-base": {
+-      "version": "7.1.4",
+-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
+-      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+     "node_modules/ajv": {
+       "version": "6.15.0",
+       "resolved": "https://registry.npmjs.org/ajv/-/ajv-6.15.0.tgz",
+@@ -3679,26 +3583,6 @@
+       "dev": true,
+       "license": "MIT"
+     },
+-    "node_modules/base64-js": {
+-      "version": "1.5.1",
+-      "resolved": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+-      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT"
+-    },
+     "node_modules/baseline-browser-mapping": {
+       "version": "2.11.1",
+       "resolved": "https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.11.1.tgz",
+@@ -3720,15 +3604,6 @@
+         "bcrypt": "bin/bcrypt"
+       }
+     },
+-    "node_modules/bignumber.js": {
+-      "version": "9.3.1",
+-      "resolved": "https://registry.npmjs.org/bignumber.js/-/bignumber.js-9.3.1.tgz",
+-      "integrity": "sha512-Ko0uX15oIUS7wJ3Rb30Fs6SkVbLmPBAKdlm7q9+ak9bbIeFf0MwuBsQV6z7+X768/cHsfg+WlysDWJcmthjsjQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": "*"
+-      }
+-    },
+     "node_modules/brace-expansion": {
+       "version": "1.1.16",
+       "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.16.tgz",
+@@ -3787,12 +3662,6 @@
+         "node": "^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7"
+       }
+     },
+-    "node_modules/buffer-equal-constant-time": {
+-      "version": "1.0.1",
+-      "resolved": "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz",
+-      "integrity": "sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==",
+-      "license": "BSD-3-Clause"
+-    },
+     "node_modules/buffer-from": {
+       "version": "1.1.2",
+       "resolved": "https://registry.npmjs.org/buffer-from/-/buffer-from-1.1.2.tgz",
+@@ -4096,15 +3965,6 @@
+       "dev": true,
+       "license": "BSD-2-Clause"
+     },
+-    "node_modules/data-uri-to-buffer": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/data-uri-to-buffer/-/data-uri-to-buffer-4.0.1.tgz",
+-      "integrity": "sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 12"
+-      }
+-    },
+     "node_modules/data-view-buffer": {
+       "version": "1.0.2",
+       "resolved": "https://registry.npmjs.org/data-view-buffer/-/data-view-buffer-1.0.2.tgz",
+@@ -4173,6 +4033,7 @@
+       "version": "4.4.3",
+       "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
+       "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
++      "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "ms": "^2.1.3"
+@@ -4898,15 +4759,6 @@
+         "node": ">= 0.4"
+       }
+     },
+-    "node_modules/ecdsa-sig-formatter": {
+-      "version": "1.0.11",
+-      "resolved": "https://registry.npmjs.org/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz",
+-      "integrity": "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+     "node_modules/electron-to-chromium": {
+       "version": "1.5.396",
+       "resolved": "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.5.396.tgz",
+@@ -5622,12 +5474,6 @@
+       "integrity": "sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==",
+       "license": "MIT"
+     },
+-    "node_modules/extend": {
+-      "version": "3.0.2",
+-      "resolved": "https://registry.npmjs.org/extend/-/extend-3.0.2.tgz",
+-      "integrity": "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g==",
+-      "license": "MIT"
+-    },
+     "node_modules/fast-deep-equal": {
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/fast-deep-equal/-/fast-deep-equal-3.1.3.tgz",
+@@ -5689,29 +5535,6 @@
+         "reusify": "^1.0.4"
+       }
+     },
+-    "node_modules/fetch-blob": {
+-      "version": "3.2.0",
+-      "resolved": "https://registry.npmjs.org/fetch-blob/-/fetch-blob-3.2.0.tgz",
+-      "integrity": "sha512-7yAQpD2UMJzLi1Dqv7qFYnPbaPx7ZfFK6PiIxQ4PfkGPyNyl2Ugx+a/umUonmKqjhM4DnfbMvdX6otXq83soQQ==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/jimmywarting"
+-        },
+-        {
+-          "type": "paypal",
+-          "url": "https://paypal.me/jimmywarting"
+-        }
+-      ],
+-      "license": "MIT",
+-      "dependencies": {
+-        "node-domexception": "^1.0.0",
+-        "web-streams-polyfill": "^3.0.3"
+-      },
+-      "engines": {
+-        "node": "^12.20 || >= 14.13"
+-      }
+-    },
+     "node_modules/file-entry-cache": {
+       "version": "8.0.0",
+       "resolved": "https://registry.npmjs.org/file-entry-cache/-/file-entry-cache-8.0.0.tgz",
+@@ -5792,18 +5615,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/formdata-polyfill": {
+-      "version": "4.0.10",
+-      "resolved": "https://registry.npmjs.org/formdata-polyfill/-/formdata-polyfill-4.0.10.tgz",
+-      "integrity": "sha512-buewHzMvYL29jdeQTVILecSaZKnt/RJWjoZCF5OW60Z67/GmSLBkOFM7qh1PI3zFNtJbaZL5eQu1vLfazOwj4g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "fetch-blob": "^3.1.2"
+-      },
+-      "engines": {
+-        "node": ">=12.20.0"
+-      }
+-    },
+     "node_modules/fsevents": {
+       "version": "2.3.3",
+       "resolved": "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz",
+@@ -5863,34 +5674,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/gaxios": {
+-      "version": "7.3.0",
+-      "resolved": "https://registry.npmjs.org/gaxios/-/gaxios-7.3.0.tgz",
+-      "integrity": "sha512-RB5vLV+vvQeoFPCX4QMK6/hjVkbIamPp1QSUD0CiZcnj12qbpiL+pLbYtgD+oZkWl0tl9z+o2Utp+MpM3QRhBA==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "extend": "^3.0.2",
+-        "https-proxy-agent": "^7.0.1",
+-        "node-fetch": "^3.3.2"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+-    "node_modules/gcp-metadata": {
+-      "version": "8.1.2",
+-      "resolved": "https://registry.npmjs.org/gcp-metadata/-/gcp-metadata-8.1.2.tgz",
+-      "integrity": "sha512-zV/5HKTfCeKWnxG0Dmrw51hEWFGfcF2xiXqcA3+J90WDuP0SvoiSO5ORvcBsifmx/FoIjgQN3oNOGaQ5PhLFkg==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "gaxios": "^7.0.0",
+-        "google-logging-utils": "^1.0.0",
+-        "json-bigint": "^1.0.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+     "node_modules/generator-function": {
+       "version": "2.0.1",
+       "resolved": "https://registry.npmjs.org/generator-function/-/generator-function-2.0.1.tgz",
+@@ -6024,32 +5807,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/google-auth-library": {
+-      "version": "10.9.1",
+-      "resolved": "https://registry.npmjs.org/google-auth-library/-/google-auth-library-10.9.1.tgz",
+-      "integrity": "sha512-i1ydyHrqcIxXkWh/uBmVkzCvIuq5yiK2ATndIe5XxKholrG/MTYP9xGYka4sQhrbIAgGjL2B6NOE7rFaiF3fXw==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "base64-js": "^1.3.0",
+-        "ecdsa-sig-formatter": "^1.0.11",
+-        "gaxios": "^7.1.4",
+-        "gcp-metadata": "8.1.2",
+-        "google-logging-utils": "1.1.3",
+-        "jws": "^4.0.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      }
+-    },
+-    "node_modules/google-logging-utils": {
+-      "version": "1.1.3",
+-      "resolved": "https://registry.npmjs.org/google-logging-utils/-/google-logging-utils-1.1.3.tgz",
+-      "integrity": "sha512-eAmLkjDjAFCVXg7A1unxHsLf961m6y17QFqXqAXGj/gVkKFrEICfStRfwUlGNfeCEjNRa32JEWOUTlYXPyyKvA==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=14"
+-      }
+-    },
+     "node_modules/gopd": {
+       "version": "1.2.0",
+       "resolved": "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz",
+@@ -6181,19 +5938,6 @@
+         "hermes-estree": "0.25.1"
+       }
+     },
+-    "node_modules/https-proxy-agent": {
+-      "version": "7.0.6",
+-      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz",
+-      "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "agent-base": "^7.1.2",
+-        "debug": "4"
+-      },
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+     "node_modules/ignore": {
+       "version": "5.3.2",
+       "resolved": "https://registry.npmjs.org/ignore/-/ignore-5.3.2.tgz",
+@@ -6790,15 +6534,6 @@
+         "node": ">=6"
+       }
+     },
+-    "node_modules/json-bigint": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/json-bigint/-/json-bigint-1.0.0.tgz",
+-      "integrity": "sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "bignumber.js": "^9.0.0"
+-      }
+-    },
+     "node_modules/json-buffer": {
+       "version": "3.0.1",
+       "resolved": "https://registry.npmjs.org/json-buffer/-/json-buffer-3.0.1.tgz",
+@@ -6849,27 +6584,6 @@
+         "node": ">=4.0"
+       }
+     },
+-    "node_modules/jwa": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/jwa/-/jwa-2.0.1.tgz",
+-      "integrity": "sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "buffer-equal-constant-time": "^1.0.1",
+-        "ecdsa-sig-formatter": "1.0.11",
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+-    "node_modules/jws": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/jws/-/jws-4.0.1.tgz",
+-      "integrity": "sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "jwa": "^2.0.1",
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+     "node_modules/keyv": {
+       "version": "4.5.4",
+       "resolved": "https://registry.npmjs.org/keyv/-/keyv-4.5.4.tgz",
+@@ -7198,12 +6912,6 @@
+       "dev": true,
+       "license": "MIT"
+     },
+-    "node_modules/long": {
+-      "version": "5.3.2",
+-      "resolved": "https://registry.npmjs.org/long/-/long-5.3.2.tgz",
+-      "integrity": "sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==",
+-      "license": "Apache-2.0"
+-    },
+     "node_modules/loose-envify": {
+       "version": "1.4.0",
+       "resolved": "https://registry.npmjs.org/loose-envify/-/loose-envify-1.4.0.tgz",
+@@ -7307,6 +7015,7 @@
+       "version": "2.1.3",
+       "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+       "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
++      "dev": true,
+       "license": "MIT"
+     },
+     "node_modules/nanoid": {
+@@ -7431,26 +7140,6 @@
+         "node": "^10 || ^12 || >=14"
+       }
+     },
+-    "node_modules/node-domexception": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/node-domexception/-/node-domexception-1.0.0.tgz",
+-      "integrity": "sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==",
+-      "deprecated": "Use your platform's native DOMException instead",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/jimmywarting"
+-        },
+-        {
+-          "type": "github",
+-          "url": "https://paypal.me/jimmywarting"
+-        }
+-      ],
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=10.5.0"
+-      }
+-    },
+     "node_modules/node-exports-info": {
+       "version": "1.6.2",
+       "resolved": "https://registry.npmjs.org/node-exports-info/-/node-exports-info-1.6.2.tgz",
+@@ -7470,24 +7159,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/node-fetch": {
+-      "version": "3.3.2",
+-      "resolved": "https://registry.npmjs.org/node-fetch/-/node-fetch-3.3.2.tgz",
+-      "integrity": "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "data-uri-to-buffer": "^4.0.0",
+-        "fetch-blob": "^3.1.4",
+-        "formdata-polyfill": "^4.0.10"
+-      },
+-      "engines": {
+-        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
+-      },
+-      "funding": {
+-        "type": "opencollective",
+-        "url": "https://opencollective.com/node-fetch"
+-      }
+-    },
+     "node_modules/node-releases": {
+       "version": "2.0.51",
+       "resolved": "https://registry.npmjs.org/node-releases/-/node-releases-2.0.51.tgz",
+@@ -7690,19 +7361,6 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
+-    "node_modules/p-retry": {
+-      "version": "4.6.2",
+-      "resolved": "https://registry.npmjs.org/p-retry/-/p-retry-4.6.2.tgz",
+-      "integrity": "sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@types/retry": "0.12.0",
+-        "retry": "^0.13.1"
+-      },
+-      "engines": {
+-        "node": ">=8"
+-      }
+-    },
+     "node_modules/parent-module": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/parent-module/-/parent-module-1.0.1.tgz",
+@@ -7951,29 +7609,6 @@
+         "react-is": "^16.13.1"
+       }
+     },
+-    "node_modules/protobufjs": {
+-      "version": "7.6.5",
+-      "resolved": "https://registry.npmjs.org/protobufjs/-/protobufjs-7.6.5.tgz",
+-      "integrity": "sha512-/FPD0nUc9jH6rfFjji9IBqOz4pcSE3CsT1m7Ep6Mdb0LxSUMj8hgl6GomOvZzpNpAqqGaXA0P3VSrZLFzIhQrw==",
+-      "hasInstallScript": true,
+-      "license": "BSD-3-Clause",
+-      "dependencies": {
+-        "@protobufjs/aspromise": "^1.1.2",
+-        "@protobufjs/base64": "^1.1.2",
+-        "@protobufjs/codegen": "^2.0.5",
+-        "@protobufjs/eventemitter": "^1.1.1",
+-        "@protobufjs/fetch": "^1.1.1",
+-        "@protobufjs/float": "^1.0.2",
+-        "@protobufjs/path": "^1.1.2",
+-        "@protobufjs/pool": "^1.1.0",
+-        "@protobufjs/utf8": "^1.1.1",
+-        "@types/node": ">=13.7.0",
+-        "long": "^5.3.2"
+-      },
+-      "engines": {
+-        "node": ">=12.0.0"
+-      }
+-    },
+     "node_modules/punycode": {
+       "version": "2.3.1",
+       "resolved": "https://registry.npmjs.org/punycode/-/punycode-2.3.1.tgz",
+@@ -8194,15 +7829,6 @@
+         "url": "https://github.com/privatenumber/resolve-pkg-maps?sponsor=1"
+       }
+     },
+-    "node_modules/retry": {
+-      "version": "0.13.1",
+-      "resolved": "https://registry.npmjs.org/retry/-/retry-0.13.1.tgz",
+-      "integrity": "sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 4"
+-      }
+-    },
+     "node_modules/reusify": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/reusify/-/reusify-1.1.0.tgz",
+@@ -8258,26 +7884,6 @@
+         "url": "https://github.com/sponsors/ljharb"
+       }
+     },
+-    "node_modules/safe-buffer": {
+-      "version": "5.2.1",
+-      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
+-      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT"
+-    },
+     "node_modules/safe-push-apply": {
+       "version": "1.0.0",
+       "resolved": "https://registry.npmjs.org/safe-push-apply/-/safe-push-apply-1.0.0.tgz",
+@@ -9091,6 +8697,7 @@
+       "version": "6.21.0",
+       "resolved": "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz",
+       "integrity": "sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==",
++      "devOptional": true,
+       "license": "MIT"
+     },
+     "node_modules/unrs-resolver": {
+@@ -9203,15 +8810,6 @@
+         "d3-timer": "^3.0.1"
+       }
+     },
+-    "node_modules/web-streams-polyfill": {
+-      "version": "3.3.3",
+-      "resolved": "https://registry.npmjs.org/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz",
+-      "integrity": "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 8"
+-      }
+-    },
+     "node_modules/which": {
+       "version": "2.0.2",
+       "resolved": "https://registry.npmjs.org/which/-/which-2.0.2.tgz",
+@@ -9327,27 +8925,6 @@
+         "node": ">=0.10.0"
+       }
+     },
+-    "node_modules/ws": {
+-      "version": "8.21.1",
+-      "resolved": "https://registry.npmjs.org/ws/-/ws-8.21.1.tgz",
+-      "integrity": "sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=10.0.0"
+-      },
+-      "peerDependencies": {
+-        "bufferutil": "^4.0.1",
+-        "utf-8-validate": ">=5.0.2"
+-      },
+-      "peerDependenciesMeta": {
+-        "bufferutil": {
+-          "optional": true
+-        },
+-        "utf-8-validate": {
+-          "optional": true
+-        }
+-      }
+-    },
+     "node_modules/xtend": {
+       "version": "4.0.2",
+       "resolved": "https://registry.npmjs.org/xtend/-/xtend-4.0.2.tgz",
+diff --git a/package.json b/package.json
+index 2eb2cae..7bf1e06 100644
+--- a/package.json
++++ b/package.json
+@@ -18,7 +18,6 @@
+     "@fontsource/ibm-plex-mono": "^5.3.0",
+     "@fontsource/manrope": "^5.3.0",
+     "@fontsource/orbitron": "^5.3.0",
+-    "@google/genai": "^2.13.0",
+     "bcryptjs": "^3.0.3",
+     "clsx": "^2.1.1",
+     "date-fns": "^4.4.0",
+diff --git a/scripts/smoke-test.ts b/scripts/smoke-test.ts
+index 2dd3e44..138dce4 100644
+--- a/scripts/smoke-test.ts
++++ b/scripts/smoke-test.ts
+@@ -118,7 +118,7 @@ async function main() {
+   const customDayExercises = await db.select().from(programExercises).where(eq(programExercises.dayId, day.id));
+   assert(customDayExercises[0]?.exerciseId === benchPress.id, "custom program exercise links to catalog");
+ 
+-  console.log("AI-import-shaped program (freeText, rounds):");
++  console.log("Legacy freeText-shaped program (already-imported data, rounds):");
+   const [imported] = await db
+     .insert(programs)
+     .values({ userId, name: "Imported Test", source: "darebee", sourcePdfName: "test.pdf" })
+@@ -129,12 +129,12 @@ async function main() {
+     .returning();
+   await db.insert(programExercises).values({ dayId: importedDay.id, freeText: "Push-ups", rounds: 3, reps: "15", orderIndex: 0 });
+   const importedExercises = await db.select().from(programExercises).where(eq(programExercises.dayId, importedDay.id));
+-  assert(importedExercises[0]?.freeText === "Push-ups" && importedExercises[0]?.rounds === 3, "AI-shaped exercise persisted");
++  assert(importedExercises[0]?.freeText === "Push-ups" && importedExercises[0]?.rounds === 3, "freeText-shaped exercise persisted");
+ 
+   console.log("Cardio session linked to a program:");
+   const [cardio] = await db
+     .insert(cardioSessions)
+-    .values({ userId, type: "darebee_cardio", distanceKm: 5, durationSec: 1500, avgPaceSecKm: 300, programId: imported.id })
++    .values({ userId, type: "outdoor_run", distanceKm: 5, durationSec: 1500, avgPaceSecKm: 300, programId: imported.id })
+     .returning();
+   assert(cardio.programId === imported.id, "cardio session links to its program");
+ 
+diff --git a/src/app/(app)/programs/import/page.tsx b/src/app/(app)/programs/import/page.tsx
+deleted file mode 100644
+index bbe2975..0000000
+--- a/src/app/(app)/programs/import/page.tsx
++++ /dev/null
+@@ -1,10 +0,0 @@
+-import { ProgramImportFlow } from "@/components/programs/program-import-flow";
+-
+-export default function ProgramImportPage() {
+-  return (
+-    <div className="space-y-6">
+-      <h1 className="font-display text-2xl uppercase tracking-wide">Import Program</h1>
+-      <ProgramImportFlow />
+-    </div>
+-  );
+-}
+diff --git a/src/app/(app)/programs/page.tsx b/src/app/(app)/programs/page.tsx
+index c8abfbe..643d4d2 100644
+--- a/src/app/(app)/programs/page.tsx
++++ b/src/app/(app)/programs/page.tsx
+@@ -1,5 +1,5 @@
+ import Link from "next/link";
+-import { FileUp, ListPlus } from "lucide-react";
++import { ListPlus } from "lucide-react";
+ import { requireCurrentUser } from "@/lib/auth/current-user";
+ import { getPrograms } from "@/lib/actions/programs";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+@@ -15,38 +15,22 @@ export default async function ProgramsPage() {
+         <h1 className="font-display text-2xl uppercase tracking-wide">Programs</h1>
+       </div>
+ 
+-      <div className="grid gap-4 sm:grid-cols-2">
+-        <Card>
+-          <CardHeader>
+-            <CardTitle className="flex items-center gap-2 text-base">
+-              <FileUp size={18} className="text-accent-strength" />
+-              Import from DAREBEE
+-            </CardTitle>
+-          </CardHeader>
+-          <CardContent>
+-            <p className="mb-4 text-sm text-text-muted">Upload a program PDF — Gemini reads it into a day-by-day plan.</p>
+-            <Link href="/programs/import">
+-              <Button className="w-full">Upload PDF</Button>
+-            </Link>
+-          </CardContent>
+-        </Card>
+-        <Card>
+-          <CardHeader>
+-            <CardTitle className="flex items-center gap-2 text-base">
+-              <ListPlus size={18} className="text-accent-cardio" />
+-              Build your own
+-            </CardTitle>
+-          </CardHeader>
+-          <CardContent>
+-            <p className="mb-4 text-sm text-text-muted">Lay out your own days, exercises, sets and reps.</p>
+-            <Link href="/programs/new">
+-              <Button variant="secondary" className="w-full">
+-                Build a Program
+-              </Button>
+-            </Link>
+-          </CardContent>
+-        </Card>
+-      </div>
++      <Card className="sm:max-w-sm">
++        <CardHeader>
++          <CardTitle className="flex items-center gap-2 text-base">
++            <ListPlus size={18} className="text-accent-cardio" />
++            Build your own
++          </CardTitle>
++        </CardHeader>
++        <CardContent>
++          <p className="mb-4 text-sm text-text-muted">Lay out your own days, exercises, sets and reps.</p>
++          <Link href="/programs/new">
++            <Button variant="secondary" className="w-full">
++              Build a Program
++            </Button>
++          </Link>
++        </CardContent>
++      </Card>
+ 
+       <div className="space-y-2">
+         {list.length === 0 && <p className="text-sm text-text-muted">No programs yet.</p>}
+diff --git a/src/app/api/programs/parse/route.ts b/src/app/api/programs/parse/route.ts
+deleted file mode 100644
+index 7dfb593..0000000
+--- a/src/app/api/programs/parse/route.ts
++++ /dev/null
+@@ -1,35 +0,0 @@
+-import { NextRequest, NextResponse } from "next/server";
+-import { requireCurrentUser } from "@/lib/auth/current-user";
+-import { parseProgramPdf } from "@/lib/ai/gemini";
+-
+-export const runtime = "nodejs";
+-export const maxDuration = 60;
+-
+-export async function POST(req: NextRequest) {
+-  try {
+-    await requireCurrentUser();
+-  } catch {
+-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+-  }
+-
+-  const form = await req.formData();
+-  const file = form.get("file");
+-  if (!(file instanceof File)) {
+-    return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+-  }
+-  if (file.type !== "application/pdf") {
+-    return NextResponse.json({ error: "Please upload a PDF" }, { status: 400 });
+-  }
+-  if (file.size > 20 * 1024 * 1024) {
+-    return NextResponse.json({ error: "PDF is too large (20MB max)" }, { status: 400 });
+-  }
+-
+-  try {
+-    const buffer = Buffer.from(await file.arrayBuffer());
+-    const parsed = await parseProgramPdf(buffer);
+-    return NextResponse.json({ parsed, fileName: file.name });
+-  } catch (err) {
+-    const message = err instanceof Error ? err.message : "Failed to parse the PDF";
+-    return NextResponse.json({ error: message }, { status: 500 });
+-  }
+-}
+diff --git a/src/components/programs/program-import-flow.tsx b/src/components/programs/program-import-flow.tsx
+deleted file mode 100644
+index b7bcc42..0000000
+--- a/src/components/programs/program-import-flow.tsx
++++ /dev/null
+@@ -1,175 +0,0 @@
+-"use client";
+-
+-import { useState, useTransition } from "react";
+-import { UploadCloud, Trash2, Loader2 } from "lucide-react";
+-import { Button } from "@/components/ui/button";
+-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+-import { Input, Label, Select } from "@/components/ui/field";
+-import { saveParsedProgram } from "@/lib/actions/programs";
+-import type { ParsedProgram, ParsedProgramDay } from "@/lib/ai/gemini";
+-
+-export function ProgramImportFlow() {
+-  const [stage, setStage] = useState<"upload" | "reviewing">("upload");
+-  const [uploading, setUploading] = useState(false);
+-  const [error, setError] = useState<string | null>(null);
+-  const [parsed, setParsed] = useState<ParsedProgram | null>(null);
+-  const [fileName, setFileName] = useState("");
+-  const [isPending, startTransition] = useTransition();
+-
+-  async function handleFile(file: File) {
+-    setError(null);
+-    setUploading(true);
+-    try {
+-      const form = new FormData();
+-      form.append("file", file);
+-      const res = await fetch("/api/programs/parse", { method: "POST", body: form });
+-      const data = await res.json();
+-      if (!res.ok) throw new Error(data.error || "Failed to parse PDF");
+-      setParsed(data.parsed);
+-      setFileName(data.fileName);
+-      setStage("reviewing");
+-    } catch (e) {
+-      setError(e instanceof Error ? e.message : "Something went wrong");
+-    } finally {
+-      setUploading(false);
+-    }
+-  }
+-
+-  function updateDay(index: number, patch: Partial<ParsedProgramDay>) {
+-    setParsed((p) => {
+-      if (!p) return p;
+-      const days = [...p.days];
+-      days[index] = { ...days[index], ...patch };
+-      return { ...p, days };
+-    });
+-  }
+-
+-  function removeDay(index: number) {
+-    setParsed((p) => (p ? { ...p, days: p.days.filter((_, i) => i !== index) } : p));
+-  }
+-
+-  function save() {
+-    if (!parsed) return;
+-    startTransition(async () => {
+-      await saveParsedProgram(parsed, fileName);
+-    });
+-  }
+-
+-  if (stage === "upload") {
+-    return (
+-      <Card>
+-        <CardHeader>
+-          <CardTitle>Import a DAREBEE Program</CardTitle>
+-        </CardHeader>
+-        <CardContent>
+-          <p className="mb-4 text-sm text-text-muted">
+-            Upload the program PDF as-is. Gemini reads it and pulls out the day-by-day structure —
+-            you review and edit everything before it&apos;s saved.
+-          </p>
+-          <label
+-            className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-border py-10 text-text-muted hover:border-accent-strength/50 hover:text-text"
+-          >
+-            {uploading ? <Loader2 className="animate-spin" size={28} /> : <UploadCloud size={28} />}
+-            <span className="text-sm">{uploading ? "Reading PDF…" : "Click to choose a PDF"}</span>
+-            <input
+-              type="file"
+-              accept="application/pdf"
+-              className="hidden"
+-              disabled={uploading}
+-              onChange={(e) => {
+-                const f = e.target.files?.[0];
+-                if (f) handleFile(f);
+-              }}
+-            />
+-          </label>
+-          {error && <p className="mt-3 text-sm text-accent-danger">{error}</p>}
+-        </CardContent>
+-      </Card>
+-    );
+-  }
+-
+-  if (!parsed) return null;
+-
+-  return (
+-    <div className="space-y-4">
+-      <Card>
+-        <CardHeader>
+-          <CardTitle>Review before saving</CardTitle>
+-        </CardHeader>
+-        <CardContent className="space-y-3">
+-          <div>
+-            <Label htmlFor="p-name">Program name</Label>
+-            <Input id="p-name" value={parsed.name} onChange={(e) => setParsed({ ...parsed, name: e.target.value })} />
+-          </div>
+-          <div>
+-            <Label htmlFor="p-desc">Description</Label>
+-            <Input
+-              id="p-desc"
+-              value={parsed.description}
+-              onChange={(e) => setParsed({ ...parsed, description: e.target.value })}
+-            />
+-          </div>
+-          <p className="text-xs text-text-muted">
+-            Parsed from <span className="text-text">{fileName}</span> — edit anything that looks off.
+-          </p>
+-        </CardContent>
+-      </Card>
+-
+-      {parsed.days.map((day, i) => (
+-        <Card key={i}>
+-          <CardHeader className="flex flex-row items-center justify-between gap-2">
+-            <div className="flex flex-1 items-center gap-2">
+-              <Input
+-                value={day.title}
+-                onChange={(e) => updateDay(i, { title: e.target.value })}
+-                className="max-w-[220px]"
+-              />
+-              <Select
+-                value={day.type}
+-                onChange={(e) => updateDay(i, { type: e.target.value as ParsedProgramDay["type"] })}
+-                className="max-w-[140px]"
+-              >
+-                <option value="strength">Strength</option>
+-                <option value="cardio">Cardio</option>
+-                <option value="skill">Skill</option>
+-                <option value="rest">Rest</option>
+-              </Select>
+-            </div>
+-            <button onClick={() => removeDay(i)} className="text-text-muted hover:text-accent-danger">
+-              <Trash2 size={16} />
+-            </button>
+-          </CardHeader>
+-          <CardContent>
+-            {day.exercises.length === 0 ? (
+-              <p className="text-sm text-text-muted">No exercises on this day.</p>
+-            ) : (
+-              <ul className="space-y-1 text-sm">
+-                {day.exercises.map((ex, j) => (
+-                  <li key={j} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded bg-surface-2 px-3 py-1.5">
+-                    <span className="font-medium">{ex.freeText}</span>
+-                    {ex.sets && <span className="text-text-muted">{ex.sets} sets</span>}
+-                    {ex.reps && <span className="text-text-muted">× {ex.reps}</span>}
+-                    {ex.rounds && <span className="text-text-muted">{ex.rounds} rounds</span>}
+-                    {ex.durationSec && <span className="text-text-muted">{ex.durationSec}s</span>}
+-                    {ex.restSec && <span className="text-text-muted">rest {ex.restSec}s</span>}
+-                  </li>
+-                ))}
+-              </ul>
+-            )}
+-          </CardContent>
+-        </Card>
+-      ))}
+-
+-      {error && <p className="text-sm text-accent-danger">{error}</p>}
+-
+-      <div className="flex gap-3">
+-        <Button variant="secondary" onClick={() => setStage("upload")}>
+-          Start over
+-        </Button>
+-        <Button onClick={save} disabled={isPending}>
+-          {isPending ? "Saving…" : "Save Program"}
+-        </Button>
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/src/db/schema.ts b/src/db/schema.ts
+index 03f13f8..088d550 100644
+--- a/src/db/schema.ts
++++ b/src/db/schema.ts
+@@ -186,7 +186,7 @@ export const bodyMetrics = pgTable(
+   (t) => [index("body_metrics_user_date_idx").on(t.userId, t.date)]
+ );
+ 
+-// ---------- Programs (DAREBEE-imported or self-curated) ----------
++// ---------- Programs (self-curated; may also hold already-imported legacy programs) ----------
+ 
+ export const programs = pgTable("programs", {
+   id: uuid("id").defaultRandom().primaryKey(),
+@@ -216,7 +216,7 @@ export const programExercises = pgTable("program_exercises", {
+   id: uuid("id").defaultRandom().primaryKey(),
+   dayId: uuid("day_id").notNull().references(() => programDays.id, { onDelete: "cascade" }),
+   exerciseId: uuid("exercise_id").references(() => exercises.id),
+-  freeText: text("free_text"), // raw name from an AI-parsed PDF, pre-matching
++  freeText: text("free_text"), // raw name from an already-imported legacy program, pre-matching
+   sets: integer("sets"),
+   reps: text("reps"), // "12" | "AMRAP" | "30s" — all valid
+   durationSec: integer("duration_sec"),
+diff --git a/src/lib/actions/programs.ts b/src/lib/actions/programs.ts
+index ed56d5c..ee33c3a 100644
+--- a/src/lib/actions/programs.ts
++++ b/src/lib/actions/programs.ts
+@@ -6,7 +6,6 @@ import { eq, and, asc } from "drizzle-orm";
+ import { db } from "@/db";
+ import { programs, programDays, programExercises, exercises } from "@/db/schema";
+ import { requireCurrentUser } from "@/lib/auth/current-user";
+-import type { ParsedProgram } from "@/lib/ai/gemini";
+ 
+ export interface CustomDayInput {
+   /** Present when editing an existing day (matches it up for an in-place
+@@ -123,46 +122,6 @@ export async function updateCustomProgram(programId: string, name: string, descr
+   redirect(`/programs/${programId}`);
+ }
+ 
+-export async function saveParsedProgram(parsed: ParsedProgram, sourcePdfName: string) {
+-  const user = await requireCurrentUser();
+-
+-  const programId = await db.transaction(async (tx) => {
+-    const [program] = await tx
+-      .insert(programs)
+-      .values({
+-        userId: user.id,
+-        name: parsed.name || "Imported Program",
+-        description: parsed.description ?? null,
+-        source: "darebee",
+-        sourcePdfName,
+-      })
+-      .returning();
+-
+-    for (const day of parsed.days) {
+-      const [d] = await tx
+-        .insert(programDays)
+-        .values({ programId: program.id, dayIndex: day.dayIndex, title: day.title, type: day.type })
+-        .returning();
+-
+-      for (const [i, ex] of day.exercises.entries()) {
+-        await tx.insert(programExercises).values({
+-          dayId: d.id,
+-          freeText: ex.freeText,
+-          sets: ex.sets,
+-          reps: ex.reps,
+-          durationSec: ex.durationSec,
+-          rounds: ex.rounds,
+-          restSec: ex.restSec,
+-          orderIndex: i,
+-        });
+-      }
+-    }
+-    return program.id;
+-  });
+-
+-  redirect(`/programs/${programId}`);
+-}
+-
+ export async function archiveProgram(id: string) {
+   const user = await requireCurrentUser();
+   await db
+@@ -221,7 +180,7 @@ export async function getProgramWithDays(userId: string, programId: string) {
+         exercises: rows.map((r) => ({
+           ...r.item,
+           displayName: r.exercise?.name ?? r.item.freeText ?? "Exercise",
+-          catalogExercise: r.exercise, // full exercise row, or null for freeText-only (DAREBEE) entries
++          catalogExercise: r.exercise, // full exercise row, or null for freeText-only entries from an already-imported legacy program
+         })),
+       };
+     })
+@@ -232,9 +191,9 @@ export async function getProgramWithDays(userId: string, programId: string) {
+ 
+ /** A single day's exercises, joined with the real catalog exercise info
+  * needed to start a live workout from it (name/equipment/trackingType).
+- * Rows with no matched exerciseId (freeText-only, from an AI import that
+- * couldn't match it to the catalog) are returned separately so the caller
+- * can tell the user those need to be added manually. */
++ * Rows with no matched exerciseId (freeText-only, from an already-imported
++ * legacy program) are returned separately so the caller can tell the user
++ * those need to be added manually. */
+ export async function getProgramDayForWorkout(dayId: string) {
+   const rows = await db
+     .select({ item: programExercises, exercise: exercises })
+diff --git a/src/lib/ai/gemini.ts b/src/lib/ai/gemini.ts
+deleted file mode 100644
+index f4ce006..0000000
+--- a/src/lib/ai/gemini.ts
++++ /dev/null
+@@ -1,101 +0,0 @@
+-import "server-only";
+-import { GoogleGenAI } from "@google/genai";
+-
+-export interface ParsedProgramExercise {
+-  freeText: string;
+-  sets: number | null;
+-  reps: string | null; // "12", "AMRAP", "30s" — kept as text, DAREBEE mixes formats
+-  durationSec: number | null;
+-  rounds: number | null;
+-  restSec: number | null;
+-}
+-
+-export interface ParsedProgramDay {
+-  dayIndex: number;
+-  title: string;
+-  type: "strength" | "cardio" | "rest";
+-  exercises: ParsedProgramExercise[];
+-}
+-
+-export interface ParsedProgram {
+-  name: string;
+-  description: string;
+-  days: ParsedProgramDay[];
+-}
+-
+-const MODEL = "gemini-2.5-flash";
+-
+-const PROMPT = `You are reading a workout program PDF (often from DAREBEE, but could be any source).
+-Extract its structure into JSON only — no prose, no markdown fences.
+-
+-Return this exact shape:
+-{
+-  "name": string,               // program title
+-  "description": string,        // 1-2 sentence summary
+-  "days": [
+-    {
+-      "dayIndex": number,        // 1-based
+-      "title": string,           // e.g. "Day 1", "Push", "Rest Day"
+-      "type": "strength" | "cardio" | "rest",
+-      "exercises": [
+-        {
+-          "freeText": string,    // the exercise name exactly as written
+-          "sets": number | null,
+-          "reps": string | null,      // could be "12", "AMRAP", "30s", "20 each side"
+-          "durationSec": number | null,
+-          "rounds": number | null,
+-          "restSec": number | null
+-        }
+-      ]
+-    }
+-  ]
+-}
+-
+-Rules:
+-- If the program is a circuit/rounds format, put the round count in "rounds" and list each move once in "exercises".
+-- Rest days still get an entry with type "rest" and an empty exercises array.
+-- If a value truly isn't stated anywhere, use null — never invent numbers.
+-- Keep exercise names close to the original wording; don't rename them to a "standard" name.`;
+-
+-export async function parseProgramPdf(pdfBuffer: Buffer): Promise<ParsedProgram> {
+-  const apiKey = process.env.GEMINI_API_KEY;
+-  if (!apiKey) {
+-    throw new Error("GEMINI_API_KEY is not set. Add it to .env to enable DAREBEE PDF import.");
+-  }
+-
+-  const ai = new GoogleGenAI({ apiKey });
+-
+-  const response = await ai.models.generateContent({
+-    model: MODEL,
+-    contents: [
+-      {
+-        role: "user",
+-        parts: [
+-          { inlineData: { mimeType: "application/pdf", data: pdfBuffer.toString("base64") } },
+-          { text: PROMPT },
+-        ],
+-      },
+-    ],
+-    config: {
+-      responseMimeType: "application/json",
+-      temperature: 0.1,
+-    },
+-  });
+-
+-  const text = response.text;
+-  if (!text) throw new Error("Gemini returned no text — the PDF may be unreadable or too large.");
+-
+-  let parsed: ParsedProgram;
+-  try {
+-    parsed = JSON.parse(text);
+-  } catch {
+-    // Occasionally still wraps in fences despite instructions — strip and retry once.
+-    const stripped = text.replace(/^```json\s*|```\s*$/g, "").trim();
+-    parsed = JSON.parse(stripped);
+-  }
+-
+-  if (!parsed.days || !Array.isArray(parsed.days)) {
+-    throw new Error("Couldn't find a day-by-day structure in that PDF.");
+-  }
+-  return parsed;
+-}

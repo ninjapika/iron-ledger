@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileUp, ListPlus } from "lucide-react";
+import { ListPlus } from "lucide-react";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getPrograms } from "@/lib/actions/programs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,38 +15,22 @@ export default async function ProgramsPage() {
         <h1 className="font-display text-2xl uppercase tracking-wide">Programs</h1>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileUp size={18} className="text-accent-strength" />
-              Import from DAREBEE
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-text-muted">Upload a program PDF — Gemini reads it into a day-by-day plan.</p>
-            <Link href="/programs/import">
-              <Button className="w-full">Upload PDF</Button>
-            </Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ListPlus size={18} className="text-accent-cardio" />
-              Build your own
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4 text-sm text-text-muted">Lay out your own days, exercises, sets and reps.</p>
-            <Link href="/programs/new">
-              <Button variant="secondary" className="w-full">
-                Build a Program
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="sm:max-w-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ListPlus size={18} className="text-accent-cardio" />
+            Build your own
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-4 text-sm text-text-muted">Lay out your own days, exercises, sets and reps.</p>
+          <Link href="/programs/new">
+            <Button variant="secondary" className="w-full">
+              Build a Program
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       <div className="space-y-2">
         {list.length === 0 && <p className="text-sm text-text-muted">No programs yet.</p>}

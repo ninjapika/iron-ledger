@@ -6,7 +6,6 @@ import { eq, and, asc } from "drizzle-orm";
 import { db } from "@/db";
 import { programs, programDays, programExercises, exercises } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import type { ParsedProgram } from "@/lib/ai/gemini";
 
 export interface CustomDayInput {
   /** Present when editing an existing day (matches it up for an in-place
@@ -123,46 +122,6 @@ export async function updateCustomProgram(programId: string, name: string, descr
   redirect(`/programs/${programId}`);
 }
 
-export async function saveParsedProgram(parsed: ParsedProgram, sourcePdfName: string) {
-  const user = await requireCurrentUser();
-
-  const programId = await db.transaction(async (tx) => {
-    const [program] = await tx
-      .insert(programs)
-      .values({
-        userId: user.id,
-        name: parsed.name || "Imported Program",
-        description: parsed.description ?? null,
-        source: "darebee",
-        sourcePdfName,
-      })
-      .returning();
-
-    for (const day of parsed.days) {
-      const [d] = await tx
-        .insert(programDays)
-        .values({ programId: program.id, dayIndex: day.dayIndex, title: day.title, type: day.type })
-        .returning();
-
-      for (const [i, ex] of day.exercises.entries()) {
-        await tx.insert(programExercises).values({
-          dayId: d.id,
-          freeText: ex.freeText,
-          sets: ex.sets,
-          reps: ex.reps,
-          durationSec: ex.durationSec,
-          rounds: ex.rounds,
-          restSec: ex.restSec,
-          orderIndex: i,
-        });
-      }
-    }
-    return program.id;
-  });
-
-  redirect(`/programs/${programId}`);
-}
-
 export async function archiveProgram(id: string) {
   const user = await requireCurrentUser();
   await db
@@ -221,7 +180,7 @@ export async function getProgramWithDays(userId: string, programId: string) {
         exercises: rows.map((r) => ({
           ...r.item,
           displayName: r.exercise?.name ?? r.item.freeText ?? "Exercise",
-          catalogExercise: r.exercise, // full exercise row, or null for freeText-only (DAREBEE) entries
+          catalogExercise: r.exercise, // full exercise row, or null for freeText-only entries from an already-imported legacy program
         })),
       };
     })
@@ -232,9 +191,9 @@ export async function getProgramWithDays(userId: string, programId: string) {
 
 /** A single day's exercises, joined with the real catalog exercise info
  * needed to start a live workout from it (name/equipment/trackingType).
- * Rows with no matched exerciseId (freeText-only, from an AI import that
- * couldn't match it to the catalog) are returned separately so the caller
- * can tell the user those need to be added manually. */
+ * Rows with no matched exerciseId (freeText-only, from an already-imported
+ * legacy program) are returned separately so the caller can tell the user
+ * those need to be added manually. */
 export async function getProgramDayForWorkout(dayId: string) {
   const rows = await db
     .select({ item: programExercises, exercise: exercises })
