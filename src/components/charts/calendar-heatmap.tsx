@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Dumbbell, Footprints, Sparkles } from "lucide-react";
 import type { MonthActivity } from "@/lib/data/dashboard";
-import { dominantWorkoutType } from "@/lib/data/workout-types";
+import { activeWorkoutTypes } from "@/lib/data/workout-types";
 import { cn } from "@/lib/cn";
 
 const MONTH_NAMES = [
@@ -33,6 +33,18 @@ const LEGEND = [
   { type: "skill" as const, icon: Sparkles, label: "Skill" },
 ];
 
+/** A day with one logged type gets that type's flat color, same as before.
+ * A day with several gets a diagonal band per type instead of collapsing
+ * to whichever one happened to have the most load — e.g. strength+cardio
+ * renders as an even orange/blue diagonal split, not a solid single color. */
+function cellBackground(types: ("strength" | "cardio" | "skill")[]): string {
+  if (types.length === 0) return "var(--type-manual)";
+  if (types.length === 1) return TYPE_VAR[types[0]];
+  const n = types.length;
+  const stops = types.flatMap((t, i) => [`${TYPE_VAR[t]} ${(i / n) * 100}%`, `${TYPE_VAR[t]} ${((i + 1) / n) * 100}%`]);
+  return `linear-gradient(135deg, ${stops.join(", ")})`;
+}
+
 const COLS = 7;
 
 type DayInfo = {
@@ -54,8 +66,8 @@ type DayInfo = {
 function DayCell({ day, size }: { day: DayInfo; size: number | "fill" }) {
   const boxStyle: React.CSSProperties =
     size === "fill"
-      ? { width: "100%", aspectRatio: "1 / 1", backgroundColor: day.bg, opacity: OPACITY[day.lvl] }
-      : { width: size, height: size, backgroundColor: day.bg, opacity: OPACITY[day.lvl] };
+      ? { width: "100%", aspectRatio: "1 / 1", background: day.bg, opacity: OPACITY[day.lvl] }
+      : { width: size, height: size, background: day.bg, opacity: OPACITY[day.lvl] };
   return (
     <div className={cn("flex flex-col items-center gap-0.5", size === "fill" && "flex-1")}>
       <div
@@ -118,9 +130,11 @@ function balancedRows(days: DayInfo[], containerWidth: number, minCell: number, 
  *   full width with no dead trailing space, rather than a fixed tiny block
  *   or a lopsided wrap.
  *
- * Each cell is colored by whichever workout type contributed the most that
- * day (strength/cardio/skill — see dominantWorkoutType), shaded by relative
- * intensity; an empty day is just the flat surface color. Only a sparse
+ * Each cell is colored by every workout type logged that day (strength/
+ * cardio/skill — see activeWorkoutTypes): a single type gets a flat color,
+ * several types split the cell into even diagonal bands, one per type
+ * (see cellBackground). Either way it's shaded by relative intensity; an
+ * empty day is just the flat surface color. Only a sparse
  * handful of days ever print a number, directly under their own cell (never
  * a full weekday-style header).
  */
@@ -153,15 +167,15 @@ export function CalendarHeatmap({
   const days: DayInfo[] = data.days.map((day, i) => {
     const dayNum = i + 1;
     const lvl = intensity(day.load, max);
-    const dominant = dominantWorkoutType(day);
+    const types = activeWorkoutTypes(day);
     return {
       date: day.date,
       dayNum,
       lvl,
-      bg: lvl === 0 ? "var(--surface-2)" : dominant ? TYPE_VAR[dominant] : "var(--type-manual)",
+      bg: lvl === 0 ? "var(--surface-2)" : cellBackground(types),
       isToday: day.date === todayKey,
       showLabel: labeledDays.has(dayNum),
-      title: day.date + (day.load > 0 ? ` — ${dominant ?? "logged"}` : ""),
+      title: day.date + (day.load > 0 ? ` — ${types.length ? types.join(" + ") : "logged"}` : ""),
     };
   });
 

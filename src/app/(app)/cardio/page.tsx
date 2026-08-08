@@ -58,7 +58,13 @@ export default async function CardioPage() {
             <div>
               <p className="font-medium">{TYPE_LABELS[h.type] ?? h.type}</p>
               <p className="text-text-muted">
-                {new Date(h.date).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                {new Date(h.date).toLocaleString(undefined, {
+                  timeZone: user.settings.timezone,
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
                 {h.distanceKm ? ` · ${h.distanceKm} km` : ""}
                 {h.durationSec ? ` · ${formatDuration(h.durationSec)}` : ""}
                 {h.avgPaceSecKm ? ` · ${formatPace(h.avgPaceSecKm)}` : ""}

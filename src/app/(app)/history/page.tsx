@@ -59,7 +59,11 @@ export default async function HistoryPage() {
                       {e.summary && <p className="truncate text-xs text-text-muted">{e.summary}</p>}
                     </div>
                     <span className="shrink-0 text-xs text-text-muted">
-                      {e.date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                      {e.date.toLocaleTimeString(undefined, {
+                        timeZone: user.settings.timezone,
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
                     </span>
                   </div>
                 );

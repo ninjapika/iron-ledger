@@ -37,3 +37,15 @@ export function dominantWorkoutType(day: { strengthLoad: number; cardioLoad: num
   if (cardioLoad === max) return "cardio";
   return "skill";
 }
+
+/** Every type that actually has load that day, in a fixed strength → cardio
+ * → skill order — as opposed to dominantWorkoutType's single "winner",
+ * this is what lets a day with more than one type logged show every color
+ * it earned instead of just one. Empty when nothing logged. */
+export function activeWorkoutTypes(day: { strengthLoad: number; cardioLoad: number; skillLoad: number }): ("strength" | "cardio" | "skill")[] {
+  const out: ("strength" | "cardio" | "skill")[] = [];
+  if (day.strengthLoad > 0) out.push("strength");
+  if (day.cardioLoad > 0) out.push("cardio");
+  if (day.skillLoad > 0) out.push("skill");
+  return out;
+}
