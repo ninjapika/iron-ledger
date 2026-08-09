@@ -1,5 +1,8 @@
+import { LogOut } from "lucide-react";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { logOut } from "@/lib/actions/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { ThemePicker } from "@/components/settings/theme-picker";
 import { PasswordForm } from "@/components/settings/password-form";
@@ -80,9 +83,19 @@ export default async function SettingsPage() {
         <CardHeader>
           <CardTitle>Account</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="mb-4 text-sm text-text-muted">{user.email}</p>
-          <PasswordForm />
+        <CardContent className="space-y-6">
+          <div>
+            <p className="mb-4 text-sm text-text-muted">{user.email}</p>
+            <PasswordForm />
+          </div>
+          <div className="border-t border-border pt-4">
+            <form action={logOut}>
+              <Button type="submit" variant="secondary">
+                <LogOut size={16} />
+                Sign out
+              </Button>
+            </form>
+          </div>
         </CardContent>
       </Card>
 
