@@ -123,6 +123,15 @@ export interface LoggedSetInput {
 }
 
 export async function createLoggedWorkout(isoDateTime: string, notes: string, sets: LoggedSetInput[], workoutType?: string) {
+  await insertLoggedWorkout(isoDateTime, notes, sets, workoutType);
+  redirect("/dashboard");
+}
+
+/** The actual DB work behind createLoggedWorkout, without the redirect —
+ * shared by the form action above and the AI agent's log_workout tool
+ * (lib/ai/agent.ts), which needs the created session back rather than a
+ * navigation. */
+export async function insertLoggedWorkout(isoDateTime: string, notes: string, sets: LoggedSetInput[], workoutType?: string) {
   const user = await requireCurrentUser();
   if (sets.length === 0) throw new Error("Add at least one set");
 
@@ -132,7 +141,7 @@ export async function createLoggedWorkout(isoDateTime: string, notes: string, se
   // "shows 5:30am" bug this replaced.
   const when = new Date(isoDateTime);
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [session] = await tx
       .insert(workoutSessions)
       .values({
@@ -162,9 +171,8 @@ export async function createLoggedWorkout(isoDateTime: string, notes: string, se
         completedAt: when,
       });
     }
+    return session;
   });
-
-  redirect("/dashboard");
 }
 
 export async function addCustomExercise(name: string, category: string, equipment: string, trackingType: string = "reps") {

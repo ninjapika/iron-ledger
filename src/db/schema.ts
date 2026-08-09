@@ -13,6 +13,7 @@ import {
   boolean,
   integer,
   doublePrecision,
+  jsonb,
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -35,6 +36,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   cardioSessions: many(cardioSessions),
   bodyMetrics: many(bodyMetrics),
   programs: many(programs),
+  aiConversations: many(aiConversations),
 }));
 
 // Long-lived "remember me" sessions. Only a hash of the token is stored, so
@@ -284,4 +286,66 @@ export const programDaysRelations = relations(programDays, ({ one, many }) => ({
 export const programExercisesRelations = relations(programExercises, ({ one }) => ({
   day: one(programDays, { fields: [programExercises.dayId], references: [programDays.id] }),
   exercise: one(exercises, { fields: [programExercises.exerciseId], references: [exercises.id] }),
+}));
+
+// ---------- AI Assistant ----------
+// Conversations and their messages live here, keyed to the user — never to
+// whichever OpenRouter key was active when they were sent. That's what
+// makes swapping the key later a non-event: nothing here needs migrating.
+export const aiConversations = pgTable("ai_conversations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title"), // null until there's enough context to summarize one
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const aiMessages = pgTable(
+  "ai_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // user | assistant | tool
+    content: text("content"), // null for an assistant turn that's pure tool_calls
+    toolCalls: jsonb("tool_calls"), // assistant-role only: [{id, name, arguments}]
+    toolCallId: text("tool_call_id"), // tool-role only — which call this answers
+    toolName: text("tool_name"), // tool-role only, so the UI can label it without a join
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("ai_messages_conversation_idx").on(t.conversationId, t.createdAt)]
+);
+
+// A write tool the model wants to call (log a workout, create/edit a
+// program) sits here, unexecuted, until the user approves it from the
+// chat UI — see lib/ai/agent.ts. "summary" is written by the model itself
+// as part of the tool call, not derived from the args afterward, so what's
+// shown for approval is exactly what the model intended to do.
+export const aiPendingActions = pgTable("ai_pending_actions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => aiConversations.id, { onDelete: "cascade" }),
+  toolCallId: text("tool_call_id").notNull(),
+  toolName: text("tool_name").notNull(),
+  toolArgs: jsonb("tool_args").notNull(),
+  summary: text("summary").notNull(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+});
+
+export const aiConversationsRelations = relations(aiConversations, ({ one, many }) => ({
+  user: one(users, { fields: [aiConversations.userId], references: [users.id] }),
+  messages: many(aiMessages),
+  pendingActions: many(aiPendingActions),
+}));
+
+export const aiMessagesRelations = relations(aiMessages, ({ one }) => ({
+  conversation: one(aiConversations, { fields: [aiMessages.conversationId], references: [aiConversations.id] }),
+}));
+
+export const aiPendingActionsRelations = relations(aiPendingActions, ({ one }) => ({
+  conversation: one(aiConversations, { fields: [aiPendingActions.conversationId], references: [aiConversations.id] }),
 }));

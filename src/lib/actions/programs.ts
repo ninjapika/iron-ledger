@@ -20,9 +20,17 @@ export interface CustomDayInput {
 }
 
 export async function createCustomProgram(name: string, description: string, days: CustomDayInput[]) {
+  const programId = await insertCustomProgram(name, description, days);
+  redirect(`/programs/${programId}`);
+}
+
+/** The actual DB work behind createCustomProgram, without the redirect —
+ * shared by the form action above and the AI agent's create_program tool
+ * (lib/ai/agent.ts). Returns the new program's id. */
+export async function insertCustomProgram(name: string, description: string, days: CustomDayInput[]): Promise<string> {
   const user = await requireCurrentUser();
 
-  const programId = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [program] = await tx
       .insert(programs)
       .values({ userId: user.id, name, description, source: "custom" })
@@ -48,8 +56,6 @@ export async function createCustomProgram(name: string, description: string, day
     }
     return program.id;
   });
-
-  redirect(`/programs/${programId}`);
 }
 
 /** Edits an existing custom program's name/description and its days'
@@ -67,6 +73,15 @@ export async function createCustomProgram(name: string, description: string, day
  * re-inserted fresh every time, which trivially handles add/remove/reorder
  * without needing to diff anything. */
 export async function updateCustomProgram(programId: string, name: string, description: string, days: CustomDayInput[]) {
+  await applyCustomProgramUpdate(programId, name, description, days);
+  revalidatePath(`/programs/${programId}`);
+  redirect(`/programs/${programId}`);
+}
+
+/** The actual DB work behind updateCustomProgram, without the redirect —
+ * shared by the form action above and the AI agent's update_program tool
+ * (lib/ai/agent.ts). */
+export async function applyCustomProgramUpdate(programId: string, name: string, description: string, days: CustomDayInput[]) {
   const user = await requireCurrentUser();
 
   const [program] = await db
@@ -117,9 +132,6 @@ export async function updateCustomProgram(programId: string, name: string, descr
       }
     }
   });
-
-  revalidatePath(`/programs/${programId}`);
-  redirect(`/programs/${programId}`);
 }
 
 export async function archiveProgram(id: string) {

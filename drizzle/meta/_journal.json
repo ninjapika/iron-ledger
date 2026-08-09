@@ -15,6 +15,13 @@
       "when": 1786248181561,
       "tag": "0001_add_ai_assistant_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786256868757,
+      "tag": "0002_add_ai_conversations",
+      "breakpoints": true
     }
   ]
 }
