@@ -35,7 +35,8 @@ docker compose -f docker-compose.dev.yml up -d
 # Copy the env template, then open .env and fill in SESSION_SECRET
 copy .env.example .env
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-# paste that output as SESSION_SECRET= in .env
+# paste that output as SESSION_SECRET= in .env, and run it again for
+# AI_KEY_ENCRYPTION_SECRET= — only needed if you'll connect the AI Assistant
 
 # Create all the tables
 npm run db:push
@@ -110,6 +111,9 @@ nano .env
 Fill in:
 - `POSTGRES_PASSWORD` — a real random value
 - `SESSION_SECRET` — `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`
+- `AI_KEY_ENCRYPTION_SECRET` — same command again, a separate value. Only
+  needed if you'll connect the AI Assistant to OpenRouter in Settings —
+  the app runs fine without it otherwise.
 - Leave `DATABASE_URL` alone — `docker-compose.yml` builds it automatically
   from `POSTGRES_PASSWORD` for the production container
 

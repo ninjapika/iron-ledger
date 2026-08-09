@@ -91,6 +91,18 @@ export const userSettings = pgTable("user_settings", {
   // Windows dev machine and a UTC-default VPS and produces wrong results
   // on either. Auto-detected client-side and synced on first load.
   timezone: text("timezone").default("UTC").notNull(),
+  // Encrypted OpenRouter API key — never stored in plaintext. Format is
+  // "iv.authTag.ciphertext" (all base64), see lib/ai/encryption.ts for the
+  // AES-256-GCM implementation. Only ever decrypted server-side, right
+  // before an outbound call to OpenRouter — never sent back to the client.
+  openrouterKeyEncrypted: text("openrouter_key_encrypted"),
+  // A safe-to-display fragment (e.g. "sk-or-••••ab12") computed once at
+  // save time, so the settings page never needs to decrypt the real key
+  // just to render something on screen.
+  openrouterKeyPreview: text("openrouter_key_preview"),
+  // OpenRouter model slug, e.g. "z-ai/glm-5.2" — which model the AI
+  // Assistant uses for this user. Null until they pick one.
+  preferredAiModel: text("preferred_ai_model"),
 });
 
 // ---------- Exercise catalog ----------

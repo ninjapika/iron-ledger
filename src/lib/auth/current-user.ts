@@ -46,6 +46,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
         units: "metric",
         restTimerDefaultSec: 90,
         timezone: "UTC",
+        openrouterKeyEncrypted: null,
+        openrouterKeyPreview: null,
+        preferredAiModel: null,
       },
   };
 }
