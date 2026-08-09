@@ -29,12 +29,12 @@ export async function getConversation(conversationId: string) {
     .limit(1);
   if (!conversation) return null;
 
-  const [messages, pendingActions] = await Promise.all([
+  const [messages, actions] = await Promise.all([
     db.select().from(aiMessages).where(eq(aiMessages.conversationId, conversationId)).orderBy(asc(aiMessages.createdAt)),
-    db.select().from(aiPendingActions).where(and(eq(aiPendingActions.conversationId, conversationId), eq(aiPendingActions.status, "pending"))),
+    db.select().from(aiPendingActions).where(eq(aiPendingActions.conversationId, conversationId)),
   ]);
 
-  return { conversation, messages, pendingActions };
+  return { conversation, messages, actions };
 }
 
 export async function sendMessage(conversationId: string, text: string): Promise<{ error?: string }> {
