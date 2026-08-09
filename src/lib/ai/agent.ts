@@ -40,11 +40,19 @@ interface WireMessage {
   content: string | null;
   tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>;
   tool_call_id?: string;
+  reasoning?: string;
 }
+
+// A modest, fixed completion budget — the earlier unset default let some
+// providers assume up to 32k tokens, which 402'd on a low-credit account
+// even for a short reply. This is plenty for a fitness-log assistant and
+// costs little regardless of which model is picked.
+const MAX_COMPLETION_TOKENS = 4096;
 
 async function callOpenRouter(apiKey: string, model: string, messages: WireMessage[]): Promise<{
   content: string | null;
   toolCalls: ToolCall[];
+  reasoning: string | null;
 }> {
   const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: "POST",
@@ -54,7 +62,16 @@ async function callOpenRouter(apiKey: string, model: string, messages: WireMessa
       "HTTP-Referer": "https://iron-ledger.local",
       "X-Title": "Iron Ledger",
     },
-    body: JSON.stringify({ model, messages, tools: TOOL_DEFINITIONS }),
+    body: JSON.stringify({
+      model,
+      messages,
+      tools: TOOL_DEFINITIONS,
+      max_tokens: MAX_COMPLETION_TOKENS,
+      // Low effort — this is a fitness log, not a research assistant, and
+      // reasoning tokens are billed as output tokens. Models that don't
+      // support reasoning just ignore this.
+      reasoning: { effort: "low" },
+    }),
   });
 
   if (!res.ok) {
@@ -79,7 +96,7 @@ async function callOpenRouter(apiKey: string, model: string, messages: WireMessa
     return { id: tc.id, name: tc.function.name, arguments: parsedArgs };
   });
 
-  return { content: message.content ?? null, toolCalls };
+  return { content: message.content ?? null, toolCalls, reasoning: typeof message.reasoning === "string" ? message.reasoning : null };
 }
 
 function rowToWireMessage(row: typeof aiMessages.$inferSelect): WireMessage {
@@ -88,6 +105,7 @@ function rowToWireMessage(row: typeof aiMessages.$inferSelect): WireMessage {
     return {
       role: "assistant",
       content: row.content,
+      reasoning: row.reasoning ?? undefined,
       tool_calls: calls.length
         ? calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments) } }))
         : undefined,
@@ -136,13 +154,14 @@ export async function runAgentLoop(conversationId: string): Promise<void> {
 
     const wireMessages: WireMessage[] = [{ role: "system", content: systemPrompt }, ...history.map(rowToWireMessage)];
 
-    const { content, toolCalls } = await callOpenRouter(apiKey, model, wireMessages);
+    const { content, toolCalls, reasoning } = await callOpenRouter(apiKey, model, wireMessages);
 
     await db.insert(aiMessages).values({
       conversationId,
       role: "assistant",
       content,
       toolCalls: toolCalls.length ? toolCalls : null,
+      reasoning,
     });
 
     if (toolCalls.length === 0) {

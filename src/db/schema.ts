@@ -312,6 +312,7 @@ export const aiMessages = pgTable(
     toolCalls: jsonb("tool_calls"), // assistant-role only: [{id, name, arguments}]
     toolCallId: text("tool_call_id"), // tool-role only — which call this answers
     toolName: text("tool_name"), // tool-role only, so the UI can label it without a join
+    reasoning: text("reasoning"), // assistant-role only — the model's thinking trace, when it returns one (see lib/ai/agent.ts)
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("ai_messages_conversation_idx").on(t.conversationId, t.createdAt)]

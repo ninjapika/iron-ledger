@@ -14,8 +14,13 @@ export interface OpenRouterModel {
 /** Only models that actually support tool calls — the AI Assistant needs
  * that to log workouts, adjust programs, etc., so there's no point
  * surfacing a model that can't do it and would silently fall back to
- * plain chat. OpenRouter can filter this server-side. */
-export async function listOpenRouterModels(): Promise<OpenRouterModel[]> {
+ * plain chat. OpenRouter can filter this server-side.
+ *
+ * freeOnly restricts to $0 models. Settings uses this (it sets the
+ * account-wide default, so it should never be able to default you onto
+ * something that costs credits); the in-chat quick-switcher passes false
+ * so you can deliberately reach for a paid model when you want one. */
+export async function listOpenRouterModels(freeOnly = false): Promise<OpenRouterModel[]> {
   const res = await fetch(`${OPENROUTER_BASE}/models?supported_parameters=tools`, {
     next: { revalidate: 3600 },
   });
@@ -43,6 +48,7 @@ export async function listOpenRouterModels(): Promise<OpenRouterModel[]> {
         isFree: prompt === 0 && completion === 0,
       };
     })
+    .filter((m) => !freeOnly || m.isFree)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

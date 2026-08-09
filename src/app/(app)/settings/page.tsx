@@ -16,7 +16,7 @@ export default async function SettingsPage() {
   let modelsError: string | null = null;
   if (connected) {
     try {
-      models = await listOpenRouterModels();
+      models = await listOpenRouterModels(true);
     } catch {
       modelsError = "Couldn't load the model list from OpenRouter right now — try refreshing.";
     }

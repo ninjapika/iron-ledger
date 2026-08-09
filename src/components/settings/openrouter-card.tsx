@@ -90,7 +90,10 @@ export function OpenRouterCard({
 
       {connected && (
         <div>
-          <Label>Model</Label>
+          <Label>Default model</Label>
+          <p className="mb-2 text-xs text-text-muted">
+            Free models only, so this default can never cost credits. Switch to a paid model anytime from the chat itself.
+          </p>
           {modelsError ? (
             <p className="text-sm text-accent-danger">{modelsError}</p>
           ) : (

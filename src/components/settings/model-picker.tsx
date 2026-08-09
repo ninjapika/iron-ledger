@@ -8,7 +8,15 @@ import { Input } from "@/components/ui/field";
 import { cn } from "@/lib/cn";
 import type { OpenRouterModel } from "@/lib/ai/openrouter";
 
-export function ModelPicker({ models, currentModelId }: { models: OpenRouterModel[]; currentModelId: string | null }) {
+export function ModelPicker({
+  models,
+  currentModelId,
+  onSelect,
+}: {
+  models: OpenRouterModel[];
+  currentModelId: string | null;
+  onSelect?: (modelId: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -22,6 +30,7 @@ export function ModelPicker({ models, currentModelId }: { models: OpenRouterMode
 
   function choose(modelId: string) {
     setPendingId(modelId);
+    onSelect?.(modelId);
     startTransition(async () => {
       await setPreferredAiModel(modelId);
       router.refresh();
