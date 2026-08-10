@@ -21,10 +21,11 @@ export default async function AssistantPage() {
       messages = data.messages;
       actions = data.actions;
     }
-    // Unfiltered here (unlike Settings) — this is a deliberate in-context
-    // switch, so the full catalog including paid models is fair game.
+    // Free-only — this is the only model picker left now that Settings'
+    // copy is gone, so it inherits the same guardrail: never a surprise
+    // credit charge from picking something here.
     try {
-      models = await listOpenRouterModels();
+      models = await listOpenRouterModels(true);
     } catch {
       // Chat still works without the picker; it'll just show the raw model id.
     }

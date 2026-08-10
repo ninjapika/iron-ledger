@@ -8,22 +8,11 @@ import { ThemePicker } from "@/components/settings/theme-picker";
 import { PasswordForm } from "@/components/settings/password-form";
 import { ExportDataButton } from "@/components/settings/export-data-button";
 import { OpenRouterCard } from "@/components/settings/openrouter-card";
-import { listOpenRouterModels, type OpenRouterModel } from "@/lib/ai/openrouter";
 
 export default async function SettingsPage() {
   const user = await requireCurrentUser();
   const profile = user.profile;
   const connected = Boolean(user.settings.openrouterKeyEncrypted);
-
-  let models: OpenRouterModel[] = [];
-  let modelsError: string | null = null;
-  if (connected) {
-    try {
-      models = await listOpenRouterModels(true);
-    } catch {
-      modelsError = "Couldn't load the model list from OpenRouter right now — try refreshing.";
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -69,13 +58,7 @@ export default async function SettingsPage() {
           <CardTitle>AI Assistant</CardTitle>
         </CardHeader>
         <CardContent>
-          <OpenRouterCard
-            connected={connected}
-            keyPreview={user.settings.openrouterKeyPreview}
-            currentModelId={user.settings.preferredAiModel}
-            models={models}
-            modelsError={modelsError}
-          />
+          <OpenRouterCard connected={connected} keyPreview={user.settings.openrouterKeyPreview} />
         </CardContent>
       </Card>
 

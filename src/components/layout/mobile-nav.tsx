@@ -17,111 +17,104 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-// Inner ring: the four most-reached-for destinations, closer to the thumb.
-// Outer ring: everything else. Both rings sweep the same wide arc above the
-// FAB but at slightly different angular offsets, so items stagger instead
-// of lining up in straight spokes — closer to the loose cluster look than
-// a perfectly even fan.
-const INNER = [
+const ITEMS = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/log", label: "Log", icon: Dumbbell },
   { href: "/assistant", label: "AI", icon: Sparkles },
-  { href: "/cardio", label: "Running", icon: Footprints },
-];
-
-const OUTER = [
   { href: "/history", label: "History", icon: History },
   { href: "/programs", label: "Plans", icon: CalendarDays },
+  { href: "/cardio", label: "Running", icon: Footprints },
   { href: "/body", label: "Body", icon: Ruler },
   { href: "/exercises", label: "Exercises", icon: ListChecks },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-function fanPosition(index: number, total: number, radius: number, startDeg: number, endDeg: number) {
-  const t = total === 1 ? 0.5 : index / (total - 1);
-  const deg = startDeg + (endDeg - startDeg) * t;
-  const rad = (deg * Math.PI) / 180;
-  return { x: Math.cos(rad) * radius, y: -Math.sin(rad) * radius };
-}
-
 export function MobileNav() {
   const pathname = usePathname();
+  // mounted/open are deliberately separate: closing needs to stay mounted
+  // long enough to actually play its transition instead of vanishing
+  // instantly (which is what the flat, unsmooth close was — the previous
+  // version had no exit transition at all).
+  const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
+  function toggle() {
+    if (open) {
+      setOpen(false); // panel/backdrop transition out; unmount on transition end
+    } else {
+      setMounted(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => setOpen(true)));
+    }
+  }
+
+  function close() {
+    setOpen(false);
+  }
+
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={() => setOpen(false)} aria-hidden="true" />
+      {mounted && (
+        <div
+          className={cn("fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 md:hidden", open ? "opacity-100" : "opacity-0")}
+          onClick={close}
+          onTransitionEnd={() => !open && setMounted(false)}
+          aria-hidden="true"
+        />
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pb-6 md:hidden" style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
-        <div className="relative">
-          {open &&
-            INNER.map((item, i) => {
-              const { x, y } = fanPosition(i, INNER.length, 78, 168, 12);
-              return <FanItem key={item.href} item={item} x={x} y={y} active={isActive(item.href)} onNavigate={() => setOpen(false)} />;
-            })}
-          {open &&
-            OUTER.map((item, i) => {
-              const { x, y } = fanPosition(i, OUTER.length, 132, 172, 8);
-              return <FanItem key={item.href} item={item} x={x} y={y} active={isActive(item.href)} onNavigate={() => setOpen(false)} />;
-            })}
-
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-label={open ? "Close menu" : "Open menu"}
-            aria-expanded={open}
-            className="relative flex h-16 w-16 items-center justify-center rounded-full bg-surface"
-            style={{ boxShadow: "var(--glow-soft), 0 4px 16px rgba(0,0,0,0.4)" }}
+      <div
+        className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center md:hidden"
+        style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+      >
+        {mounted && (
+          <div
+            className={cn(
+              "mb-3 w-[min(88vw,320px)] origin-bottom rounded-theme border border-border bg-surface-2 p-3 shadow-2xl transition-all duration-200 ease-out",
+              open ? "scale-100 opacity-100" : "pointer-events-none scale-90 opacity-0"
+            )}
           >
-            <span className={cn("absolute transition-all duration-200", open ? "scale-0 opacity-0" : "scale-100 opacity-100")}>
-              <span className="relative block h-7 w-7">
-                <span className="absolute inset-0 rounded-full border-2 border-accent-strength" />
-                <span className="absolute inset-[5px] rounded-full border-2 border-accent-cardio" />
-              </span>
+            <div className="grid grid-cols-3 gap-2">
+              {ITEMS.map((item) => {
+                const active = isActive(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={close}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 rounded-theme py-3 text-xs transition-colors",
+                      active ? "bg-accent-strength/15 text-accent-strength" : "text-text-muted hover:bg-surface hover:text-text"
+                    )}
+                  >
+                    <Icon size={22} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+          className="relative flex h-16 w-16 items-center justify-center rounded-full bg-surface transition-transform duration-200 active:scale-95"
+          style={{ boxShadow: "var(--glow-soft), 0 4px 16px rgba(0,0,0,0.4)" }}
+        >
+          <span className={cn("absolute transition-all duration-200", open ? "scale-0 opacity-0" : "scale-100 opacity-100")}>
+            <span className="relative block h-7 w-7">
+              <span className="absolute inset-0 rounded-full border-2 border-accent-strength" />
+              <span className="absolute inset-[5px] rounded-full border-2 border-accent-cardio" />
             </span>
-            <X size={26} className={cn("absolute text-text transition-all duration-200", open ? "scale-100 opacity-100" : "scale-0 opacity-0")} />
-          </button>
-        </div>
+          </span>
+          <X size={26} className={cn("absolute text-text transition-all duration-200", open ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-0 opacity-0")} />
+        </button>
       </div>
     </>
-  );
-}
-
-function FanItem({
-  item,
-  x,
-  y,
-  active,
-  onNavigate,
-}: {
-  item: { href: string; label: string; icon: typeof LayoutDashboard };
-  x: number;
-  y: number;
-  active: boolean;
-  onNavigate: () => void;
-}) {
-  const Icon = item.icon;
-  return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className="absolute left-1/2 top-1/2 flex flex-col items-center gap-1"
-      style={{ transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))` }}
-    >
-      <span
-        className={cn(
-          "flex h-12 w-12 items-center justify-center rounded-full border",
-          active ? "border-accent-strength bg-accent-strength/15 text-accent-strength" : "border-border bg-surface text-text"
-        )}
-        style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.35)" }}
-      >
-        <Icon size={20} />
-      </span>
-      <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] text-text-muted">{item.label}</span>
-    </Link>
   );
 }

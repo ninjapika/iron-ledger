@@ -86,7 +86,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden rounded-theme border border-border bg-surface-2">
+    <div className="flex flex-1 flex-col overflow-hidden rounded-theme border border-border bg-surface-2 shadow-xl">
       <div className="relative border-b border-border">
         <button
           type="button"
@@ -116,7 +116,7 @@ export function ChatPanel({
           if (m.role === "user") {
             return (
               <div key={m.id} className="flex justify-end">
-                <div className="max-w-[80%] rounded-theme bg-accent-strength/15 px-3 py-2 text-sm text-text">{m.content}</div>
+                <div className="max-w-[80%] rounded-theme bg-accent-strength/15 px-3 py-2 text-sm text-text shadow-sm">{m.content}</div>
               </div>
             );
           }
@@ -131,7 +131,7 @@ export function ChatPanel({
                     <p className="mt-1.5 whitespace-pre-wrap">{m.reasoning}</p>
                   </details>
                 )}
-                <div className="max-w-[80%] whitespace-pre-wrap rounded-theme bg-surface px-3 py-2 text-sm text-text">{m.content}</div>
+                <div className="max-w-[80%] whitespace-pre-wrap rounded-theme bg-surface px-3 py-2 text-sm text-text shadow-sm">{m.content}</div>
               </div>
             );
           }
@@ -213,7 +213,7 @@ function ActionCard({
   onRespond: (actionId: string, approve: boolean) => void;
 }) {
   return (
-    <div className="rounded-theme border border-accent-strength/40 bg-accent-strength/5 p-3">
+    <div className="rounded-theme border border-accent-strength/40 bg-accent-strength/5 p-3 shadow-md">
       <p className="text-sm text-text">{action.summary}</p>
       <div className="mt-2 flex gap-2">
         <Button type="button" disabled={disabled} onClick={() => onRespond(action.id, true)}>

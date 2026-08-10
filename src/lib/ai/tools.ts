@@ -1,8 +1,7 @@
 import "server-only";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, and, desc, gte } from "drizzle-orm";
 import { db } from "@/db";
-import { exercises } from "@/db/schema";
-import { getWorkoutHistory } from "@/lib/actions/history";
+import { exercises, workoutSessions, workoutSets, cardioSessions } from "@/db/schema";
 import { getPrograms, getProgramWithDays } from "@/lib/actions/programs";
 import { getBodyMetricHistory } from "@/lib/actions/tracking";
 
@@ -193,9 +192,86 @@ export async function executeReadTool(userId: string, timezone: string, name: st
     }
     case "get_recent_workouts": {
       const days = Number(args.days ?? 30);
-      const entries = await getWorkoutHistory(userId, timezone, 60);
-      const cutoff = Date.now() - days * 86_400_000;
-      return entries.filter((e) => e.date.getTime() >= cutoff);
+      const cutoff = new Date(Date.now() - days * 86_400_000);
+
+      const rows = await db
+        .select({
+          sessionId: workoutSessions.id,
+          date: workoutSessions.date,
+          workoutType: workoutSessions.workoutType,
+          notes: workoutSessions.notes,
+          exerciseName: exercises.name,
+          reps: workoutSets.reps,
+          weightKg: workoutSets.weightKg,
+          durationSec: workoutSets.durationSec,
+          isWarmup: workoutSets.isWarmup,
+        })
+        .from(workoutSessions)
+        .leftJoin(workoutSets, eq(workoutSets.sessionId, workoutSessions.id))
+        .leftJoin(exercises, eq(workoutSets.exerciseId, exercises.id))
+        .where(and(eq(workoutSessions.userId, userId), gte(workoutSessions.date, cutoff)))
+        .orderBy(desc(workoutSessions.date));
+
+      type RawSet = { reps: number | null; weightKg: number | null; durationSec: number | null; isWarmup: boolean };
+      const sessionsMap = new Map<
+        string,
+        { date: Date; workoutType: string | null; notes: string | null; exercises: Map<string, RawSet[]> }
+      >();
+
+      for (const r of rows) {
+        if (!sessionsMap.has(r.sessionId)) {
+          sessionsMap.set(r.sessionId, { date: r.date, workoutType: r.workoutType, notes: r.notes, exercises: new Map() });
+        }
+        const session = sessionsMap.get(r.sessionId)!;
+        if (r.exerciseName) {
+          if (!session.exercises.has(r.exerciseName)) session.exercises.set(r.exerciseName, []);
+          session.exercises.get(r.exerciseName)!.push({
+            reps: r.reps,
+            weightKg: r.weightKg,
+            durationSec: r.durationSec,
+            isWarmup: r.isWarmup ?? false,
+          });
+        }
+      }
+
+      const round1 = (n: number) => Math.round(n * 10) / 10;
+
+      const strength = Array.from(sessionsMap.values())
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .map((s) => {
+          const exerciseSummaries = Array.from(s.exercises.entries()).map(([name, sets]) => {
+            // Volume = sum of reps x weight across working (non-warmup) sets —
+            // the standard training-load definition, computed here rather
+            // than left for the model to add up so it can't get it wrong.
+            const volumeKg = sets
+              .filter((x) => !x.isWarmup)
+              .reduce((sum, x) => sum + (x.weightKg && x.reps ? x.weightKg * x.reps : 0), 0);
+            return {
+              name,
+              totalSets: sets.length,
+              volumeKg: round1(volumeKg),
+              sets: sets.map((x) => ({ reps: x.reps, weightKg: x.weightKg, durationSec: x.durationSec, warmup: x.isWarmup })),
+            };
+          });
+          return {
+            date: s.date.toISOString(),
+            workoutType: s.workoutType,
+            notes: s.notes,
+            totalSets: exerciseSummaries.reduce((n, e) => n + e.totalSets, 0),
+            totalVolumeKg: round1(exerciseSummaries.reduce((n, e) => n + e.volumeKg, 0)),
+            exercises: exerciseSummaries,
+          };
+        });
+
+      const cardioRows = await db
+        .select()
+        .from(cardioSessions)
+        .where(and(eq(cardioSessions.userId, userId), gte(cardioSessions.date, cutoff)))
+        .orderBy(desc(cardioSessions.date));
+
+      const cardio = cardioRows.map((c) => ({ date: c.date.toISOString(), type: c.type, distanceKm: c.distanceKm, durationSec: c.durationSec }));
+
+      return { strength, cardio };
     }
     case "get_current_programs": {
       const list = await getPrograms(userId);

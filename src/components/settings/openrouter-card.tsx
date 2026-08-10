@@ -7,24 +7,10 @@ import type { ActionResult } from "@/lib/actions/settings";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/field";
 import { PlateSignalIcon } from "@/components/icons/plate-signal-icon";
-import { ModelPicker } from "@/components/settings/model-picker";
-import type { OpenRouterModel } from "@/lib/ai/openrouter";
 
 const initialState: ActionResult = {};
 
-export function OpenRouterCard({
-  connected,
-  keyPreview,
-  currentModelId,
-  models,
-  modelsError,
-}: {
-  connected: boolean;
-  keyPreview: string | null;
-  currentModelId: string | null;
-  models: OpenRouterModel[];
-  modelsError: string | null;
-}) {
+export function OpenRouterCard({ connected, keyPreview }: { connected: boolean; keyPreview: string | null }) {
   const [state, formAction, pending] = useActionState(async (_: ActionResult, formData: FormData) => {
     const result = await saveOpenRouterKey(formData);
     return result ?? {};
@@ -49,7 +35,7 @@ export function OpenRouterCard({
         </div>
         <div>
           <p className="text-sm font-medium text-text">OpenRouter</p>
-          <p className="text-xs text-text-muted">Bring your own key — the AI Assistant uses whatever model you pick below.</p>
+          <p className="text-xs text-text-muted">Bring your own key — pick which model to use from the AI Assistant chat itself.</p>
         </div>
       </div>
 
@@ -86,20 +72,6 @@ export function OpenRouterCard({
             )}
           </div>
         </form>
-      )}
-
-      {connected && (
-        <div>
-          <Label>Default model</Label>
-          <p className="mb-2 text-xs text-text-muted">
-            Free models only, so this default can never cost credits. Switch to a paid model anytime from the chat itself.
-          </p>
-          {modelsError ? (
-            <p className="text-sm text-accent-danger">{modelsError}</p>
-          ) : (
-            <ModelPicker models={models} currentModelId={currentModelId} />
-          )}
-        </div>
       )}
     </div>
   );
