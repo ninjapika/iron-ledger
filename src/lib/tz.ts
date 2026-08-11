@@ -28,6 +28,16 @@ export function dateKeyInTZ(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+/** The 0-23 hour an instant falls on in the given timezone — the same
+ * "don't trust the server's local timezone" fix as dateKeyInTZ above, for
+ * code that needs an hour-of-day rather than a calendar day (e.g. guessing
+ * morning/afternoon/evening for a logged workout). `date.getHours()` would
+ * silently use whatever TZ the Node process itself runs in instead. */
+export function hourInTZ(date: Date, timeZone: string): number {
+  const hour = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23" }).format(date);
+  return Number(hour);
+}
+
 /** Today's key in the user's timezone. */
 export function todayKeyInTZ(timeZone: string): string {
   return dateKeyInTZ(new Date(), timeZone);

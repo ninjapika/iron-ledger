@@ -25,7 +25,7 @@ export async function startLiveWorkout(programDayId?: string, programId?: string
       userId: user.id,
       mode: "live",
       workoutType: resolvedType ?? "manual",
-      timeOfDay: timeOfDay ?? guessTimeOfDay(),
+      timeOfDay: timeOfDay ?? guessTimeOfDay(new Date(), user.settings.timezone),
       programDayId: programDayId ?? null,
       programId: programId ?? null,
     })
@@ -149,7 +149,7 @@ export async function insertLoggedWorkout(isoDateTime: string, notes: string, se
         mode: "logged",
         date: when,
         workoutType: workoutType || null,
-        timeOfDay: guessTimeOfDay(when),
+        timeOfDay: guessTimeOfDay(when, user.settings.timezone),
         notes: notes || null,
         finishedAt: when,
       })

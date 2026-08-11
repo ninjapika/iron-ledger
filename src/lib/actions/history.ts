@@ -124,6 +124,48 @@ export async function updateSet(setId: string, patch: { reps?: number; durationS
   revalidatePath("/history");
 }
 
+/** Adds one set for an exercise within an already-logged session — used
+ * both to add a brand-new exercise to the session (its first set) and to
+ * add another set to one that's already there; the two are the same
+ * operation from the DB's point of view, just with a different starting
+ * setNumber. Fields are left blank/null when not supplied, same as a
+ * freshly-added row anywhere else in the app — they're filled in via the
+ * existing per-cell inputs afterward. */
+export async function addHistorySet(
+  sessionId: string,
+  exerciseId: string,
+  input: { reps?: number; durationSec?: number; weightKg?: number; isWarmup?: boolean } = {}
+) {
+  const user = await requireCurrentUser();
+
+  const [session] = await db
+    .select({ id: workoutSessions.id })
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.userId, user.id)))
+    .limit(1);
+  if (!session) throw new Error("Workout not found.");
+
+  const [lastSet] = await db
+    .select({ setNumber: workoutSets.setNumber })
+    .from(workoutSets)
+    .where(and(eq(workoutSets.sessionId, sessionId), eq(workoutSets.exerciseId, exerciseId)))
+    .orderBy(desc(workoutSets.setNumber))
+    .limit(1);
+
+  await db.insert(workoutSets).values({
+    sessionId,
+    exerciseId,
+    setNumber: (lastSet?.setNumber ?? 0) + 1,
+    reps: input.reps,
+    durationSec: input.durationSec,
+    weightKg: input.weightKg,
+    isWarmup: input.isWarmup ?? false,
+  });
+
+  revalidatePath(`/history/${sessionId}`);
+  revalidatePath("/history");
+}
+
 export async function deleteHistorySet(setId: string, sessionId: string) {
   await requireCurrentUser();
   await db.delete(workoutSets).where(eq(workoutSets.id, setId));

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
-import { updateSet, deleteHistorySet, updateSessionNotes, deleteWorkoutSession } from "@/lib/actions/history";
+import { updateSet, addHistorySet, deleteHistorySet, updateSessionNotes, deleteWorkoutSession } from "@/lib/actions/history";
+import { ExercisePicker, type ExerciseOption } from "@/components/workout/exercise-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/cn";
@@ -11,6 +12,7 @@ import { EQUIPMENT_LABELS } from "@/lib/data/exercise-labels";
 
 interface SetRow {
   id: string;
+  exerciseId: string;
   exerciseName: string;
   equipment: string;
   trackingType: string;
@@ -32,10 +34,13 @@ export function SessionEditor({
   sessionId,
   initialNotes,
   sets,
+  exercises,
 }: {
   sessionId: string;
   initialNotes: string;
   sets: SetRow[];
+  /** Full catalog, for the "add an exercise" picker below. */
+  exercises: ExerciseOption[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -47,10 +52,18 @@ export function SessionEditor({
     if (!byExercise.has(s.exerciseName)) byExercise.set(s.exerciseName, []);
     byExercise.get(s.exerciseName)!.push(s);
   }
+  const activeExerciseIds = [...new Set(sets.map((s) => s.exerciseId))];
 
   function saveField(setId: string, patch: Parameters<typeof updateSet>[1]) {
     startTransition(async () => {
       await updateSet(setId, patch);
+      router.refresh();
+    });
+  }
+
+  function addSet(exerciseId: string) {
+    startTransition(async () => {
+      await addHistorySet(sessionId, exerciseId);
       router.refresh();
     });
   }
@@ -80,7 +93,12 @@ export function SessionEditor({
 
   return (
     <div className="max-w-2xl space-y-3">
+      <ExercisePicker exercises={exercises} excludeIds={activeExerciseIds} onSelect={addSet} placeholder="Add an exercise you forgot…" />
+
       <Card className="divide-y divide-border overflow-hidden">
+        {byExercise.size === 0 && (
+          <p className="px-3 py-4 text-sm text-text-muted">No exercises logged yet — add one above.</p>
+        )}
         {[...byExercise.entries()].map(([name, exSets]) => {
           const usesWeight = exSets[0]?.equipment !== "bodyweight" && exSets[0]?.equipment !== "cardio";
           const timed = exSets[0]?.trackingType === "duration";
@@ -160,6 +178,13 @@ export function SessionEditor({
                   </div>
                 ))}
               </div>
+              <button
+                onClick={() => addSet(exSets[0].exerciseId)}
+                disabled={isPending}
+                className="mt-1.5 text-xs text-accent-strength hover:underline"
+              >
+                + Add set
+              </button>
             </div>
           );
         })}

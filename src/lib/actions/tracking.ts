@@ -25,7 +25,7 @@ export async function logCardioSession(input: {
     userId: user.id,
     date: when,
     type: input.type,
-    timeOfDay: guessTimeOfDay(when),
+    timeOfDay: guessTimeOfDay(when, user.settings.timezone),
     distanceKm: input.distanceKm,
     durationSec: input.durationSec,
     avgPaceSecKm,
