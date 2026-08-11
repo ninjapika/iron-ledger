@@ -6,6 +6,7 @@ import { getProgramWithDays, archiveProgram, resetProgramProgress } from "@/lib/
 import { startLiveWorkout } from "@/lib/actions/workouts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { cn } from "@/lib/cn";
 
 const TYPE_COLOR: Record<string, string> = {
@@ -26,9 +27,9 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-2xl uppercase tracking-wide">{program.name}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl uppercase tracking-wide break-words">{program.name}</h1>
           {program.description && <p className="mt-1 text-sm text-text-muted">{program.description}</p>}
           {totalCount > 0 && (
             <p className="mt-1 text-xs text-text-muted">
@@ -36,7 +37,7 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {program.source === "custom" && (
             <Link href={`/programs/${program.id}/edit`} className="text-xs text-text-muted hover:text-text">
               Edit
@@ -49,11 +50,15 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
               </Button>
             </form>
           )}
-          <form action={async () => { "use server"; await archiveProgram(program.id); }}>
-            <Button type="submit" variant="ghost" className="text-xs">
-              Archive
-            </Button>
-          </form>
+          <ConfirmButton
+            onConfirm={archiveProgram.bind(null, program.id)}
+            title="Archive this program?"
+            description={`"${program.name}" will move out of your active programs. You can still find it archived, but this leaves this page.`}
+            confirmLabel="Archive"
+            className="text-xs"
+          >
+            Archive
+          </ConfirmButton>
         </div>
       </div>
 

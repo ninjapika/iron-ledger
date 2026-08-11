@@ -141,6 +141,7 @@ export async function archiveProgram(id: string) {
     .set({ archived: true })
     .where(and(eq(programs.id, id), eq(programs.userId, user.id)));
   revalidatePath("/programs");
+  redirect("/programs");
 }
 
 /** Clears the "completed" marker on every day in this program so it can be
