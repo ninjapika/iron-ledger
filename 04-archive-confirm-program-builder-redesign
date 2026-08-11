@@ -1,0 +1,271 @@
+diff --git a/src/app/(app)/programs/[id]/page.tsx b/src/app/(app)/programs/[id]/page.tsx
+index 69d58eb..475e390 100644
+--- a/src/app/(app)/programs/[id]/page.tsx
++++ b/src/app/(app)/programs/[id]/page.tsx
+@@ -6,6 +6,7 @@ import { getProgramWithDays, archiveProgram, resetProgramProgress } from "@/lib/
+ import { startLiveWorkout } from "@/lib/actions/workouts";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { Button } from "@/components/ui/button";
++import { ConfirmButton } from "@/components/ui/confirm-button";
+ import { cn } from "@/lib/cn";
+ 
+ const TYPE_COLOR: Record<string, string> = {
+@@ -26,9 +27,9 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{
+ 
+   return (
+     <div className="space-y-6">
+-      <div className="flex items-start justify-between">
+-        <div>
+-          <h1 className="font-display text-2xl uppercase tracking-wide">{program.name}</h1>
++      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
++        <div className="min-w-0">
++          <h1 className="font-display text-2xl uppercase tracking-wide break-words">{program.name}</h1>
+           {program.description && <p className="mt-1 text-sm text-text-muted">{program.description}</p>}
+           {totalCount > 0 && (
+             <p className="mt-1 text-xs text-text-muted">
+@@ -36,7 +37,7 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{
+             </p>
+           )}
+         </div>
+-        <div className="flex items-center gap-2">
++        <div className="flex shrink-0 items-center gap-2">
+           {program.source === "custom" && (
+             <Link href={`/programs/${program.id}/edit`} className="text-xs text-text-muted hover:text-text">
+               Edit
+@@ -49,11 +50,15 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{
+               </Button>
+             </form>
+           )}
+-          <form action={async () => { "use server"; await archiveProgram(program.id); }}>
+-            <Button type="submit" variant="ghost" className="text-xs">
+-              Archive
+-            </Button>
+-          </form>
++          <ConfirmButton
++            onConfirm={archiveProgram.bind(null, program.id)}
++            title="Archive this program?"
++            description={`"${program.name}" will move out of your active programs. You can still find it archived, but this leaves this page.`}
++            confirmLabel="Archive"
++            className="text-xs"
++          >
++            Archive
++          </ConfirmButton>
+         </div>
+       </div>
+ 
+diff --git a/src/components/programs/custom-program-builder.tsx b/src/components/programs/custom-program-builder.tsx
+index 6f2f5c8..3035229 100644
+--- a/src/components/programs/custom-program-builder.tsx
++++ b/src/components/programs/custom-program-builder.tsx
+@@ -2,7 +2,7 @@
+ 
+ import { useState, useTransition } from "react";
+ import { unstable_rethrow } from "next/navigation";
+-import { Trash2, Plus } from "lucide-react";
++import { Trash2, Plus, Pencil, ChevronUp } from "lucide-react";
+ import { ExercisePicker, type ExerciseOption } from "@/components/workout/exercise-picker";
+ import { createCustomProgram, updateCustomProgram, type CustomDayInput } from "@/lib/actions/programs";
+ import { Button } from "@/components/ui/button";
+@@ -50,9 +50,21 @@ export function CustomProgramBuilder({
+   const [description, setDescription] = useState(initialDescription ?? "");
+   const [days, setDays] = useState<DayDraft[]>(initialDays?.length ? initialDays : [{ title: "Day 1", type: "strength", exercises: [] }]);
+   const [error, setError] = useState<string | null>(null);
++  // Which single day currently has its exercise editor open, if any. A
++  // multi-day program used to render every day's full exercise picker +
++  // list stacked on the page at once — fine for one day, exhausting to
++  // scroll past for five. Only one day's editor opens at a time now,
++  // toggled by the pencil icon in that day's header; everything else shows
++  // just a compact summary line. A brand-new program (still just its
++  // default single day) opens straight into that day instead of making
++  // the first click be "find the pencil."
++  const [expandedIdx, setExpandedIdx] = useState<number | null>(initialDays?.length ? null : 0);
+ 
+   function addDay() {
+-    setDays((d) => [...d, { title: `Day ${d.length + 1}`, type: "strength", exercises: [] }]);
++    setDays((d) => {
++      setExpandedIdx(d.length); // jump straight into editing the new day
++      return [...d, { title: `Day ${d.length + 1}`, type: "strength", exercises: [] }];
++    });
+   }
+ 
+   function updateDay(i: number, patch: Partial<DayDraft>) {
+@@ -61,13 +73,20 @@ export function CustomProgramBuilder({
+ 
+   function removeDay(i: number) {
+     setDays((d) => d.filter((_, idx) => idx !== i));
++    setExpandedIdx((cur) => (cur === null ? null : cur === i ? null : cur > i ? cur - 1 : cur));
+   }
+ 
+   function addExerciseToDay(dayIdx: number, ex: ExerciseOption) {
+     setDays((d) =>
+       d.map((day, idx) =>
+         idx === dayIdx
+-          ? { ...day, exercises: [...day.exercises, { exercise: ex, sets: "3", reps: "10", durationSec: "30", restSec: "90" }] }
++          ? {
++              ...day,
++              // Newest exercise goes on top — same ordering the live-workout
++              // and logged-workout pickers use, so it's immediately visible
++              // instead of requiring a scroll past everything already added.
++              exercises: [{ exercise: ex, sets: "3", reps: "10", durationSec: "", restSec: "" }, ...day.exercises],
++            }
+           : day
+       )
+     );
+@@ -141,10 +160,11 @@ export function CustomProgramBuilder({
+ 
+       {days.map((day, dayIdx) => {
+         const allowedCategories = categoriesForWorkoutType(day.type === "rest" ? "manual" : day.type);
++        const expanded = expandedIdx === dayIdx;
+         return (
+           <Card key={dayIdx}>
+             <CardHeader className="flex flex-row items-center justify-between gap-2">
+-              <div className="flex flex-1 items-center gap-2">
++              <div className="flex flex-1 flex-wrap items-center gap-2">
+                 <Input value={day.title} onChange={(e) => updateDay(dayIdx, { title: e.target.value })} className="max-w-[200px]" />
+                 <Select
+                   value={day.type}
+@@ -157,13 +177,43 @@ export function CustomProgramBuilder({
+                   <option value="rest">Rest</option>
+                 </Select>
+               </div>
+-              {days.length > 1 && (
+-                <button onClick={() => removeDay(dayIdx)} className="text-text-muted hover:text-accent-danger">
+-                  <Trash2 size={16} />
+-                </button>
+-              )}
++              <div className="flex shrink-0 items-center gap-1">
++                {day.type !== "rest" && (
++                  <button
++                    type="button"
++                    onClick={() => setExpandedIdx(expanded ? null : dayIdx)}
++                    className="rounded p-1.5 text-text-muted hover:bg-surface-2 hover:text-text"
++                    aria-label={expanded ? "Done editing this day's exercises" : "Edit this day's exercises"}
++                    title={expanded ? "Done" : "Edit exercises"}
++                  >
++                    {expanded ? <ChevronUp size={16} /> : <Pencil size={14} />}
++                  </button>
++                )}
++                {days.length > 1 && (
++                  <button
++                    onClick={() => removeDay(dayIdx)}
++                    className="rounded p-1.5 text-text-muted hover:bg-surface-2 hover:text-accent-danger"
++                    aria-label="Delete day"
++                  >
++                    <Trash2 size={16} />
++                  </button>
++                )}
++              </div>
+             </CardHeader>
+-            {day.type !== "rest" && (
++
++            {day.type !== "rest" && !expanded && (
++              <CardContent className="pt-0">
++                <p className="text-xs text-text-muted">
++                  {day.exercises.length === 0
++                    ? "No exercises yet."
++                    : `${day.exercises.length} exercise${day.exercises.length === 1 ? "" : "s"}: ${day.exercises
++                        .map((e) => e.exercise.name)
++                        .join(", ")}`}
++                </p>
++              </CardContent>
++            )}
++
++            {day.type !== "rest" && expanded && (
+               <CardContent className="space-y-3">
+                 <ExercisePicker
+                   exercises={exercises}
+diff --git a/src/components/ui/confirm-button.tsx b/src/components/ui/confirm-button.tsx
+new file mode 100644
+index 0000000..d175cfb
+--- /dev/null
++++ b/src/components/ui/confirm-button.tsx
+@@ -0,0 +1,77 @@
++"use client";
++
++import { useState, useTransition, useSyncExternalStore } from "react";
++import { createPortal } from "react-dom";
++import { Button } from "@/components/ui/button";
++
++/** A button that asks before doing the thing, instead of a native
++ * `window.confirm()` (which reads as an out-of-theme browser dialog next
++ * to everything else in the app). `onConfirm` can be a plain async
++ * function or a server action bound with its arguments via `.bind(null,
++ * ...)` — if it redirects, that throw is deliberately left unswallowed
++ * here so navigation still happens. */
++export function ConfirmButton({
++  onConfirm,
++  children,
++  confirmLabel = "Confirm",
++  title,
++  description,
++  variant = "ghost",
++  className,
++}: {
++  onConfirm: () => Promise<void>;
++  children: React.ReactNode;
++  confirmLabel?: string;
++  title: string;
++  description: string;
++  variant?: "ghost" | "danger";
++  className?: string;
++}) {
++  const [open, setOpen] = useState(false);
++  const [isPending, startTransition] = useTransition();
++  const mounted = useSyncExternalStore(
++    () => () => {},
++    () => true,
++    () => false
++  );
++
++  function confirm() {
++    startTransition(async () => {
++      await onConfirm();
++      setOpen(false);
++    });
++  }
++
++  return (
++    <>
++      <Button type="button" variant={variant} className={className} onClick={() => setOpen(true)}>
++        {children}
++      </Button>
++      {mounted &&
++        open &&
++        createPortal(
++          <div
++            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4"
++            onClick={() => !isPending && setOpen(false)}
++          >
++            <div
++              className="tooltip-pop w-full max-w-sm rounded-theme border border-border bg-surface p-5 shadow-2xl"
++              onClick={(e) => e.stopPropagation()}
++            >
++              <h3 className="font-display text-lg uppercase tracking-wide text-text">{title}</h3>
++              <p className="mt-1.5 text-sm text-text-muted">{description}</p>
++              <div className="mt-5 flex justify-end gap-2">
++                <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={isPending}>
++                  Cancel
++                </Button>
++                <Button type="button" variant="danger" onClick={confirm} disabled={isPending}>
++                  {isPending ? "Working…" : confirmLabel}
++                </Button>
++              </div>
++            </div>
++          </div>,
++          document.body
++        )}
++    </>
++  );
++}
+diff --git a/src/lib/actions/programs.ts b/src/lib/actions/programs.ts
+index 8718732..0a9b72f 100644
+--- a/src/lib/actions/programs.ts
++++ b/src/lib/actions/programs.ts
+@@ -141,6 +141,7 @@ export async function archiveProgram(id: string) {
+     .set({ archived: true })
+     .where(and(eq(programs.id, id), eq(programs.userId, user.id)));
+   revalidatePath("/programs");
++  redirect("/programs");
+ }
+ 
+ /** Clears the "completed" marker on every day in this program so it can be
