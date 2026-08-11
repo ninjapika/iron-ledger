@@ -47,7 +47,11 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
   function addExercise(id: string) {
     const ex = exercises.find((e) => e.id === id);
     if (!ex) return;
-    setDrafts((prev) => [...prev, { exercise: ex, sets: [emptySet()] }]);
+    // Newest addition goes on top — same ordering the live-workout picker
+    // uses (see LiveSessionClient), so a freshly-added exercise is always
+    // right there instead of requiring a scroll past everything already
+    // logged.
+    setDrafts((prev) => [{ exercise: ex, sets: [emptySet()] }, ...prev]);
   }
 
   function updateSet(exIdx: number, setIdx: number, patch: Partial<DraftSet>) {

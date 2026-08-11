@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { eq, and, or, isNull, desc } from "drizzle-orm";
+import { eq, and, or, isNull, desc, ilike } from "drizzle-orm";
 import { db } from "@/db";
 import { workoutSessions, workoutSets, exercises, programExercises, programDays } from "@/db/schema";
 import { requireCurrentUser } from "@/lib/auth/current-user";
@@ -175,15 +175,34 @@ export async function insertLoggedWorkout(isoDateTime: string, notes: string, se
   });
 }
 
-export async function addCustomExercise(name: string, category: string, equipment: string, trackingType: string = "reps") {
+export async function addCustomExercise(
+  name: string,
+  category: string,
+  equipment: string,
+  trackingType: string = "reps"
+): Promise<{ error?: string; exercise?: typeof exercises.$inferSelect }> {
   const user = await requireCurrentUser();
+
+  // ILIKE with no wildcards is Postgres's case-insensitive equality — this
+  // catches "Push Up" vs "push up" vs "PUSH UP" as the same name. Scoped to
+  // the same shared-catalog-or-mine visibility as getExerciseCatalog, since
+  // that's the set this name would actually collide with in every picker.
+  const [existing] = await db
+    .select({ id: exercises.id })
+    .from(exercises)
+    .where(and(ilike(exercises.name, name.trim()), or(isNull(exercises.userId), eq(exercises.userId, user.id))))
+    .limit(1);
+  if (existing) {
+    return { error: `"${name.trim()}" is already in your exercise library.` };
+  }
+
   const [ex] = await db
     .insert(exercises)
     .values({ name, category, equipment, trackingType, isCustom: true, userId: user.id })
     .returning();
   revalidatePath("/exercises");
   revalidatePath("/log");
-  return ex;
+  return { exercise: ex };
 }
 
 export async function updateExercise(id: string, name: string, category: string, equipment: string, trackingType: string = "reps") {

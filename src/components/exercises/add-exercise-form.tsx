@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { addCustomExercise } from "@/lib/actions/workouts";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/field";
+import { FieldTooltip } from "@/components/ui/field-tooltip";
 
 export function AddExerciseForm() {
   const [isPending, startTransition] = useTransition();
@@ -11,20 +12,29 @@ export function AddExerciseForm() {
   const [category, setCategory] = useState("push");
   const [equipment, setEquipment] = useState("dumbbell");
   const [trackingType, setTrackingType] = useState("reps");
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const nameFieldRef = useRef<HTMLDivElement>(null);
 
   function submit() {
     if (!name.trim()) return;
+    setDuplicateError(null);
     startTransition(async () => {
-      await addCustomExercise(name.trim(), category, equipment, trackingType);
+      const result = await addCustomExercise(name.trim(), category, equipment, trackingType);
+      if (result.error) {
+        setDuplicateError(result.error);
+        setTimeout(() => setDuplicateError(null), 3000);
+        return;
+      }
       setName("");
     });
   }
 
   return (
     <div className="flex flex-wrap items-end gap-3">
-      <div className="flex-1 min-w-[180px]">
+      <div ref={nameFieldRef} className="flex-1 min-w-[180px]">
         <Label htmlFor="ex-name">Name</Label>
         <Input id="ex-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Zottman Curl" />
+        <FieldTooltip message={duplicateError} anchorRef={nameFieldRef} />
       </div>
       <div>
         <Label htmlFor="ex-category">Category</Label>
