@@ -1,0 +1,1056 @@
+diff --git a/package-lock.json b/package-lock.json
+index 8746262..2d34ba5 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -13,6 +13,7 @@
+         "@fontsource/ibm-plex-mono": "^5.3.0",
+         "@fontsource/manrope": "^5.3.0",
+         "@fontsource/orbitron": "^5.3.0",
++        "@formkit/auto-animate": "^0.10.0",
+         "bcryptjs": "^3.0.3",
+         "clsx": "^2.1.1",
+         "date-fns": "^4.4.0",
+@@ -1403,6 +1404,12 @@
+         "url": "https://github.com/sponsors/ayuhito"
+       }
+     },
++    "node_modules/@formkit/auto-animate": {
++      "version": "0.10.0",
++      "resolved": "https://registry.npmjs.org/@formkit/auto-animate/-/auto-animate-0.10.0.tgz",
++      "integrity": "sha512-KGomRttjUfORuPUaR/ZGQw+6xfMrTM+sxnILv7JAd9AmabU9rg9i6gF/iC0Ih+QpKCubJpCA/1DX9UHKE8cX+A==",
++      "license": "MIT"
++    },
+     "node_modules/@humanfs/core": {
+       "version": "0.19.2",
+       "resolved": "https://registry.npmjs.org/@humanfs/core/-/core-0.19.2.tgz",
+diff --git a/package.json b/package.json
+index 7bf1e06..17a19fc 100644
+--- a/package.json
++++ b/package.json
+@@ -18,6 +18,7 @@
+     "@fontsource/ibm-plex-mono": "^5.3.0",
+     "@fontsource/manrope": "^5.3.0",
+     "@fontsource/orbitron": "^5.3.0",
++    "@formkit/auto-animate": "^0.10.0",
+     "bcryptjs": "^3.0.3",
+     "clsx": "^2.1.1",
+     "date-fns": "^4.4.0",
+diff --git a/src/app/(app)/body/page.tsx b/src/app/(app)/body/page.tsx
+index b09072d..6677ded 100644
+--- a/src/app/(app)/body/page.tsx
++++ b/src/app/(app)/body/page.tsx
+@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
+ import { getBodyMetricHistory, deleteBodyMetric } from "@/lib/actions/tracking";
+ import { getBodyWeightTrend } from "@/lib/data/dashboard";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
++import { AnimatedList } from "@/components/ui/animated-list";
+ import { BodyMetricForm } from "@/components/body/body-metric-form";
+ import { BodyWeightTrendChart } from "@/components/charts/bodyweight-trend-chart";
+ 
+@@ -35,7 +36,7 @@ export default async function BodyMetricsPage() {
+         </CardContent>
+       </Card>
+ 
+-      <div className="space-y-2">
++      <AnimatedList className="space-y-2">
+         {history.map((h) => {
+           const measurements = h.measurements ? (JSON.parse(h.measurements) as Record<string, number>) : null;
+           return (
+@@ -60,7 +61,7 @@ export default async function BodyMetricsPage() {
+             </div>
+           );
+         })}
+-      </div>
++      </AnimatedList>
+     </div>
+   );
+ }
+diff --git a/src/app/(app)/cardio/page.tsx b/src/app/(app)/cardio/page.tsx
+index 46c36dc..91e2398 100644
+--- a/src/app/(app)/cardio/page.tsx
++++ b/src/app/(app)/cardio/page.tsx
+@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
+ import { getCardioHistory, deleteCardioSession } from "@/lib/actions/tracking";
+ import { getCardioTrend } from "@/lib/data/dashboard";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
++import { AnimatedList } from "@/components/ui/animated-list";
+ import { CardioForm } from "@/components/cardio/cardio-form";
+ import { CardioTrendChart } from "@/components/charts/cardio-trend-chart";
+ import { formatDuration, formatPace } from "@/lib/format";
+@@ -52,7 +53,7 @@ export default async function CardioPage() {
+         </Card>
+       )}
+ 
+-      <div className="space-y-2">
++      <AnimatedList className="space-y-2">
+         {history.map((h) => (
+           <div key={h.id} className="flex items-center justify-between rounded-theme border border-border bg-surface px-4 py-3 text-sm">
+             <div>
+@@ -77,7 +78,7 @@ export default async function CardioPage() {
+             </form>
+           </div>
+         ))}
+-      </div>
++      </AnimatedList>
+     </div>
+   );
+ }
+diff --git a/src/components/history/session-editor.tsx b/src/components/history/session-editor.tsx
+index 14dde4c..f86de4f 100644
+--- a/src/components/history/session-editor.tsx
++++ b/src/components/history/session-editor.tsx
+@@ -3,6 +3,7 @@
+ import { useState, useTransition } from "react";
+ import { useRouter } from "next/navigation";
+ import { Trash2 } from "lucide-react";
++import { useAutoAnimate } from "@formkit/auto-animate/react";
+ import { updateSet, addHistorySet, deleteHistorySet, updateSessionNotes, deleteWorkoutSession } from "@/lib/actions/history";
+ import { ExercisePicker, type ExerciseOption } from "@/components/workout/exercise-picker";
+ import { Button } from "@/components/ui/button";
+@@ -46,6 +47,7 @@ export function SessionEditor({
+   const [isPending, startTransition] = useTransition();
+   const [notes, setNotes] = useState(initialNotes);
+   const [savedNotes, setSavedNotes] = useState(false);
++  const [groupsListRef] = useAutoAnimate();
+ 
+   const byExercise = new Map<string, SetRow[]>();
+   for (const s of sets) {
+@@ -95,99 +97,21 @@ export function SessionEditor({
+     <div className="max-w-2xl space-y-3">
+       <ExercisePicker exercises={exercises} excludeIds={activeExerciseIds} onSelect={addSet} placeholder="Add an exercise you forgot…" />
+ 
+-      <Card className="divide-y divide-border overflow-hidden">
++      <Card className="divide-y divide-border overflow-hidden" ref={groupsListRef}>
+         {byExercise.size === 0 && (
+           <p className="px-3 py-4 text-sm text-text-muted">No exercises logged yet — add one above.</p>
+         )}
+-        {[...byExercise.entries()].map(([name, exSets]) => {
+-          const usesWeight = exSets[0]?.equipment !== "bodyweight" && exSets[0]?.equipment !== "cardio";
+-          const timed = exSets[0]?.trackingType === "duration";
+-          // Fixed column template per exercise (weight column only exists
+-          // when this exercise actually uses one) so every set row within
+-          // it lines up exactly, instead of inputs floating at ad hoc
+-          // widths with a lot of empty trailing space.
+-          const cols = usesWeight ? "1.4rem 1.6rem 1fr 1fr 1fr 1.6rem" : "1.4rem 1.6rem 1fr 1fr 1.6rem";
+-          return (
+-            <div key={name} className="px-3 py-2.5">
+-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+-                <h3 className="truncate font-display text-sm uppercase tracking-wide text-text">{name}</h3>
+-                <span className="shrink-0 text-[10px] text-text-muted">{EQUIPMENT_LABELS[exSets[0]?.equipment] ?? ""}</span>
+-              </div>
+-              <div className="space-y-1">
+-                <div
+-                  className="grid items-center gap-1 px-1 text-[10px] uppercase tracking-wide text-text-muted"
+-                  style={{ gridTemplateColumns: cols }}
+-                >
+-                  <span />
+-                  <span title="Warm-up">W</span>
+-                  <span>{timed ? "Sec" : "Reps"}</span>
+-                  {usesWeight && <span>Kg</span>}
+-                  <span>RPE</span>
+-                  <span />
+-                </div>
+-                {exSets.map((s) => (
+-                  <div
+-                    key={s.id}
+-                    className="grid items-center gap-1 rounded-theme bg-surface-2 px-1 py-1"
+-                    style={{ gridTemplateColumns: cols }}
+-                  >
+-                    <span className="text-xs text-text-muted">#{s.setNumber}</span>
+-                    <input
+-                      type="checkbox"
+-                      title="Warm-up set"
+-                      defaultChecked={s.isWarmup}
+-                      onChange={(e) => saveField(s.id, { isWarmup: e.target.checked })}
+-                      className="h-3.5 w-3.5 accent-accent-strength"
+-                    />
+-                    {timed ? (
+-                      <input
+-                        type="number"
+-                        defaultValue={s.durationSec ?? ""}
+-                        onBlur={(e) => saveField(s.id, { durationSec: e.target.value ? Number(e.target.value) : undefined })}
+-                        className={cellInput}
+-                      />
+-                    ) : (
+-                      <input
+-                        type="number"
+-                        defaultValue={s.reps ?? ""}
+-                        onBlur={(e) => saveField(s.id, { reps: e.target.value ? Number(e.target.value) : undefined })}
+-                        className={cellInput}
+-                      />
+-                    )}
+-                    {usesWeight && (
+-                      <input
+-                        type="number"
+-                        step="0.5"
+-                        defaultValue={s.weightKg ?? ""}
+-                        onBlur={(e) => saveField(s.id, { weightKg: e.target.value ? Number(e.target.value) : undefined })}
+-                        className={cellInput}
+-                      />
+-                    )}
+-                    <input
+-                      type="number"
+-                      step="0.5"
+-                      min={6}
+-                      max={10}
+-                      defaultValue={s.rpe ?? ""}
+-                      onBlur={(e) => saveField(s.id, { rpe: e.target.value ? Number(e.target.value) : undefined })}
+-                      className={cellInput}
+-                    />
+-                    <button onClick={() => removeSet(s.id)} className="text-text-muted hover:text-accent-danger" title="Delete set">
+-                      <Trash2 size={13} className="mx-auto" />
+-                    </button>
+-                  </div>
+-                ))}
+-              </div>
+-              <button
+-                onClick={() => addSet(exSets[0].exerciseId)}
+-                disabled={isPending}
+-                className="mt-1.5 text-xs text-accent-strength hover:underline"
+-              >
+-                + Add set
+-              </button>
+-            </div>
+-          );
+-        })}
++        {[...byExercise.entries()].map(([name, exSets]) => (
++          <ExerciseSetGroup
++            key={name}
++            name={name}
++            exSets={exSets}
++            isPending={isPending}
++            onSaveField={saveField}
++            onAddSet={addSet}
++            onRemoveSet={removeSet}
++          />
++        ))}
+       </Card>
+ 
+       <Card className={cn("px-3 py-2.5")}>
+@@ -208,3 +132,109 @@ export function SessionEditor({
+     </div>
+   );
+ }
++
++function ExerciseSetGroup({
++  name,
++  exSets,
++  isPending,
++  onSaveField,
++  onAddSet,
++  onRemoveSet,
++}: {
++  name: string;
++  exSets: SetRow[];
++  isPending: boolean;
++  onSaveField: (setId: string, patch: Parameters<typeof updateSet>[1]) => void;
++  onAddSet: (exerciseId: string) => void;
++  onRemoveSet: (setId: string) => void;
++}) {
++  const usesWeight = exSets[0]?.equipment !== "bodyweight" && exSets[0]?.equipment !== "cardio";
++  const timed = exSets[0]?.trackingType === "duration";
++  // Fixed column template per exercise (weight column only exists when
++  // this exercise actually uses one) so every set row within it lines up
++  // exactly, instead of inputs floating at ad hoc widths with a lot of
++  // empty trailing space.
++  const cols = usesWeight ? "1.4rem 1.6rem 1fr 1fr 1fr 1.6rem" : "1.4rem 1.6rem 1fr 1fr 1.6rem";
++  const [setsListRef] = useAutoAnimate();
++
++  return (
++    <div className="px-3 py-2.5">
++      <div className="mb-1.5 flex items-baseline justify-between gap-2">
++        <h3 className="truncate font-display text-sm uppercase tracking-wide text-text">{name}</h3>
++        <span className="shrink-0 text-[10px] text-text-muted">{EQUIPMENT_LABELS[exSets[0]?.equipment] ?? ""}</span>
++      </div>
++      <div className="space-y-1" ref={setsListRef}>
++        <div
++          className="grid items-center gap-1 px-1 text-[10px] uppercase tracking-wide text-text-muted"
++          style={{ gridTemplateColumns: cols }}
++        >
++          <span />
++          <span title="Warm-up">W</span>
++          <span>{timed ? "Sec" : "Reps"}</span>
++          {usesWeight && <span>Kg</span>}
++          <span>RPE</span>
++          <span />
++        </div>
++        {exSets.map((s) => (
++          <div
++            key={s.id}
++            className="grid items-center gap-1 rounded-theme bg-surface-2 px-1 py-1"
++            style={{ gridTemplateColumns: cols }}
++          >
++            <span className="text-xs text-text-muted">#{s.setNumber}</span>
++            <input
++              type="checkbox"
++              title="Warm-up set"
++              defaultChecked={s.isWarmup}
++              onChange={(e) => onSaveField(s.id, { isWarmup: e.target.checked })}
++              className="h-3.5 w-3.5 accent-accent-strength"
++            />
++            {timed ? (
++              <input
++                type="number"
++                defaultValue={s.durationSec ?? ""}
++                onBlur={(e) => onSaveField(s.id, { durationSec: e.target.value ? Number(e.target.value) : undefined })}
++                className={cellInput}
++              />
++            ) : (
++              <input
++                type="number"
++                defaultValue={s.reps ?? ""}
++                onBlur={(e) => onSaveField(s.id, { reps: e.target.value ? Number(e.target.value) : undefined })}
++                className={cellInput}
++              />
++            )}
++            {usesWeight && (
++              <input
++                type="number"
++                step="0.5"
++                defaultValue={s.weightKg ?? ""}
++                onBlur={(e) => onSaveField(s.id, { weightKg: e.target.value ? Number(e.target.value) : undefined })}
++                className={cellInput}
++              />
++            )}
++            <input
++              type="number"
++              step="0.5"
++              min={6}
++              max={10}
++              defaultValue={s.rpe ?? ""}
++              onBlur={(e) => onSaveField(s.id, { rpe: e.target.value ? Number(e.target.value) : undefined })}
++              className={cellInput}
++            />
++            <button onClick={() => onRemoveSet(s.id)} className="text-text-muted hover:text-accent-danger" title="Delete set">
++              <Trash2 size={13} className="mx-auto" />
++            </button>
++          </div>
++        ))}
++      </div>
++      <button
++        onClick={() => onAddSet(exSets[0].exerciseId)}
++        disabled={isPending}
++        className="mt-1.5 text-xs text-accent-strength hover:underline"
++      >
++        + Add set
++      </button>
++    </div>
++  );
++}
+diff --git a/src/components/programs/custom-program-builder.tsx b/src/components/programs/custom-program-builder.tsx
+index 3035229..870d46c 100644
+--- a/src/components/programs/custom-program-builder.tsx
++++ b/src/components/programs/custom-program-builder.tsx
+@@ -3,6 +3,7 @@
+ import { useState, useTransition } from "react";
+ import { unstable_rethrow } from "next/navigation";
+ import { Trash2, Plus, Pencil, ChevronUp } from "lucide-react";
++import { useAutoAnimate } from "@formkit/auto-animate/react";
+ import { ExercisePicker, type ExerciseOption } from "@/components/workout/exercise-picker";
+ import { createCustomProgram, updateCustomProgram, type CustomDayInput } from "@/lib/actions/programs";
+ import { Button } from "@/components/ui/button";
+@@ -23,11 +24,22 @@ interface DayDraft {
+    * one added in this editing session. Preserved through to the update
+    * action so existing days get updated in place, not deleted+recreated. */
+   id?: string;
++  /** Client-only React/animation identity, generated once per day-draft
++   * and never sent to the server (see the explicit payload mapping in
++   * submit() below) — separate from `id` because a brand-new day doesn't
++   * have a server id yet, but still needs a stable key so deleting an
++   * earlier day animates the day that actually got removed instead of
++   * whichever one ends up at the end of the array. */
++  key: string;
+   title: string;
+   type: "strength" | "cardio" | "skill" | "rest";
+   exercises: DayExerciseDraft[];
+ }
+ 
++function newDay(title: string): DayDraft {
++  return { key: crypto.randomUUID(), title, type: "strength", exercises: [] };
++}
++
+ export function CustomProgramBuilder({
+   exercises,
+   programId,
+@@ -42,13 +54,15 @@ export function CustomProgramBuilder({
+   programId?: string;
+   initialName?: string;
+   initialDescription?: string;
+-  initialDays?: DayDraft[];
++  initialDays?: Array<Omit<DayDraft, "key">>;
+ }) {
+   const isEditing = !!programId;
+   const [isPending, startTransition] = useTransition();
+   const [name, setName] = useState(initialName ?? "");
+   const [description, setDescription] = useState(initialDescription ?? "");
+-  const [days, setDays] = useState<DayDraft[]>(initialDays?.length ? initialDays : [{ title: "Day 1", type: "strength", exercises: [] }]);
++  const [days, setDays] = useState<DayDraft[]>(
++    initialDays?.length ? initialDays.map((d) => ({ ...d, key: crypto.randomUUID() })) : [newDay("Day 1")]
++  );
+   const [error, setError] = useState<string | null>(null);
+   // Which single day currently has its exercise editor open, if any. A
+   // multi-day program used to render every day's full exercise picker +
+@@ -58,28 +72,30 @@ export function CustomProgramBuilder({
+   // just a compact summary line. A brand-new program (still just its
+   // default single day) opens straight into that day instead of making
+   // the first click be "find the pencil."
+-  const [expandedIdx, setExpandedIdx] = useState<number | null>(initialDays?.length ? null : 0);
++  const [expandedKey, setExpandedKey] = useState<string | null>(initialDays?.length ? null : days[0].key);
++  const [daysListRef] = useAutoAnimate();
+ 
+   function addDay() {
+     setDays((d) => {
+-      setExpandedIdx(d.length); // jump straight into editing the new day
+-      return [...d, { title: `Day ${d.length + 1}`, type: "strength", exercises: [] }];
++      const day = newDay(`Day ${d.length + 1}`);
++      setExpandedKey(day.key); // jump straight into editing the new day
++      return [...d, day];
+     });
+   }
+ 
+-  function updateDay(i: number, patch: Partial<DayDraft>) {
+-    setDays((d) => d.map((day, idx) => (idx === i ? { ...day, ...patch } : day)));
++  function updateDay(key: string, patch: Partial<DayDraft>) {
++    setDays((d) => d.map((day) => (day.key === key ? { ...day, ...patch } : day)));
+   }
+ 
+-  function removeDay(i: number) {
+-    setDays((d) => d.filter((_, idx) => idx !== i));
+-    setExpandedIdx((cur) => (cur === null ? null : cur === i ? null : cur > i ? cur - 1 : cur));
++  function removeDay(key: string) {
++    setDays((d) => d.filter((day) => day.key !== key));
++    setExpandedKey((cur) => (cur === key ? null : cur));
+   }
+ 
+-  function addExerciseToDay(dayIdx: number, ex: ExerciseOption) {
++  function addExerciseToDay(key: string, ex: ExerciseOption) {
+     setDays((d) =>
+-      d.map((day, idx) =>
+-        idx === dayIdx
++      d.map((day) =>
++        day.key === key
+           ? {
+               ...day,
+               // Newest exercise goes on top — same ordering the live-workout
+@@ -92,16 +108,20 @@ export function CustomProgramBuilder({
+     );
+   }
+ 
+-  function removeExerciseFromDay(dayIdx: number, exIdx: number) {
++  function removeExerciseFromDay(dayKey: string, exerciseId: string) {
+     setDays((d) =>
+-      d.map((day, idx) => (idx === dayIdx ? { ...day, exercises: day.exercises.filter((_, j) => j !== exIdx) } : day))
++      d.map((day) =>
++        day.key === dayKey ? { ...day, exercises: day.exercises.filter((x) => x.exercise.id !== exerciseId) } : day
++      )
+     );
+   }
+ 
+-  function updateExerciseField(dayIdx: number, exIdx: number, patch: Partial<DayExerciseDraft>) {
++  function updateExerciseField(dayKey: string, exerciseId: string, patch: Partial<DayExerciseDraft>) {
+     setDays((d) =>
+-      d.map((dd, i) =>
+-        i !== dayIdx ? dd : { ...dd, exercises: dd.exercises.map((x, j) => (j === exIdx ? { ...x, ...patch } : x)) }
++      d.map((day) =>
++        day.key !== dayKey
++          ? day
++          : { ...day, exercises: day.exercises.map((x) => (x.exercise.id === exerciseId ? { ...x, ...patch } : x)) }
+       )
+     );
+   }
+@@ -158,116 +178,23 @@ export function CustomProgramBuilder({
+         </CardContent>
+       </Card>
+ 
+-      {days.map((day, dayIdx) => {
+-        const allowedCategories = categoriesForWorkoutType(day.type === "rest" ? "manual" : day.type);
+-        const expanded = expandedIdx === dayIdx;
+-        return (
+-          <Card key={dayIdx}>
+-            <CardHeader className="flex flex-row items-center justify-between gap-2">
+-              <div className="flex flex-1 flex-wrap items-center gap-2">
+-                <Input value={day.title} onChange={(e) => updateDay(dayIdx, { title: e.target.value })} className="max-w-[200px]" />
+-                <Select
+-                  value={day.type}
+-                  onChange={(e) => updateDay(dayIdx, { type: e.target.value as DayDraft["type"] })}
+-                  className="max-w-[140px]"
+-                >
+-                  <option value="strength">Strength</option>
+-                  <option value="cardio">Cardio</option>
+-                  <option value="skill">Skill</option>
+-                  <option value="rest">Rest</option>
+-                </Select>
+-              </div>
+-              <div className="flex shrink-0 items-center gap-1">
+-                {day.type !== "rest" && (
+-                  <button
+-                    type="button"
+-                    onClick={() => setExpandedIdx(expanded ? null : dayIdx)}
+-                    className="rounded p-1.5 text-text-muted hover:bg-surface-2 hover:text-text"
+-                    aria-label={expanded ? "Done editing this day's exercises" : "Edit this day's exercises"}
+-                    title={expanded ? "Done" : "Edit exercises"}
+-                  >
+-                    {expanded ? <ChevronUp size={16} /> : <Pencil size={14} />}
+-                  </button>
+-                )}
+-                {days.length > 1 && (
+-                  <button
+-                    onClick={() => removeDay(dayIdx)}
+-                    className="rounded p-1.5 text-text-muted hover:bg-surface-2 hover:text-accent-danger"
+-                    aria-label="Delete day"
+-                  >
+-                    <Trash2 size={16} />
+-                  </button>
+-                )}
+-              </div>
+-            </CardHeader>
+-
+-            {day.type !== "rest" && !expanded && (
+-              <CardContent className="pt-0">
+-                <p className="text-xs text-text-muted">
+-                  {day.exercises.length === 0
+-                    ? "No exercises yet."
+-                    : `${day.exercises.length} exercise${day.exercises.length === 1 ? "" : "s"}: ${day.exercises
+-                        .map((e) => e.exercise.name)
+-                        .join(", ")}`}
+-                </p>
+-              </CardContent>
+-            )}
+-
+-            {day.type !== "rest" && expanded && (
+-              <CardContent className="space-y-3">
+-                <ExercisePicker
+-                  exercises={exercises}
+-                  excludeIds={day.exercises.map((e) => e.exercise.id)}
+-                  allowedCategories={allowedCategories}
+-                  onSelect={(id) => {
+-                    const ex = exercises.find((e) => e.id === id);
+-                    if (ex) addExerciseToDay(dayIdx, ex);
+-                  }}
+-                />
+-                {day.exercises.map((e, exIdx) => {
+-                  const timed = e.exercise.trackingType === "duration";
+-                  return (
+-                    <div key={exIdx} className="flex flex-wrap items-center gap-2 rounded bg-surface-2 px-3 py-2 text-sm">
+-                      <span className="flex-1 min-w-[120px] font-medium">{e.exercise.name}</span>
+-                      <span className="text-[10px] text-text-muted">{EQUIPMENT_LABELS[e.exercise.equipment]}</span>
+-                      <Input
+-                        className="w-16"
+-                        value={e.sets}
+-                        onChange={(ev) => updateExerciseField(dayIdx, exIdx, { sets: ev.target.value })}
+-                        placeholder="Sets"
+-                      />
+-                      {timed ? (
+-                        <Input
+-                          className="w-24"
+-                          value={e.durationSec}
+-                          onChange={(ev) => updateExerciseField(dayIdx, exIdx, { durationSec: ev.target.value })}
+-                          placeholder="Seconds"
+-                        />
+-                      ) : (
+-                        <Input
+-                          className="w-20"
+-                          value={e.reps}
+-                          onChange={(ev) => updateExerciseField(dayIdx, exIdx, { reps: ev.target.value })}
+-                          placeholder="Reps"
+-                        />
+-                      )}
+-                      <Input
+-                        className="w-20"
+-                        value={e.restSec}
+-                        onChange={(ev) => updateExerciseField(dayIdx, exIdx, { restSec: ev.target.value })}
+-                        placeholder="Rest s"
+-                      />
+-                      <button onClick={() => removeExerciseFromDay(dayIdx, exIdx)} className="text-text-muted hover:text-accent-danger">
+-                        <Trash2 size={14} />
+-                      </button>
+-                    </div>
+-                  );
+-                })}
+-              </CardContent>
+-            )}
+-          </Card>
+-        );
+-      })}
++      <div className="space-y-4" ref={daysListRef}>
++        {days.map((day) => (
++          <ProgramDayCard
++            key={day.key}
++            day={day}
++            exercises={exercises}
++            expanded={expandedKey === day.key}
++            canDelete={days.length > 1}
++            onToggleExpanded={() => setExpandedKey(expandedKey === day.key ? null : day.key)}
++            onUpdateDay={(patch) => updateDay(day.key, patch)}
++            onRemoveDay={() => removeDay(day.key)}
++            onAddExercise={(ex) => addExerciseToDay(day.key, ex)}
++            onRemoveExercise={(exerciseId) => removeExerciseFromDay(day.key, exerciseId)}
++            onUpdateExerciseField={(exerciseId, patch) => updateExerciseField(day.key, exerciseId, patch)}
++          />
++        ))}
++      </div>
+ 
+       <Button variant="secondary" onClick={addDay} className="gap-1.5">
+         <Plus size={15} />
+@@ -284,3 +211,139 @@ export function CustomProgramBuilder({
+     </div>
+   );
+ }
++
++function ProgramDayCard({
++  day,
++  exercises,
++  expanded,
++  canDelete,
++  onToggleExpanded,
++  onUpdateDay,
++  onRemoveDay,
++  onAddExercise,
++  onRemoveExercise,
++  onUpdateExerciseField,
++}: {
++  day: DayDraft;
++  exercises: ExerciseOption[];
++  expanded: boolean;
++  canDelete: boolean;
++  onToggleExpanded: () => void;
++  onUpdateDay: (patch: Partial<DayDraft>) => void;
++  onRemoveDay: () => void;
++  onAddExercise: (ex: ExerciseOption) => void;
++  onRemoveExercise: (exerciseId: string) => void;
++  onUpdateExerciseField: (exerciseId: string, patch: Partial<DayExerciseDraft>) => void;
++}) {
++  const allowedCategories = categoriesForWorkoutType(day.type === "rest" ? "manual" : day.type);
++  const [exerciseListRef] = useAutoAnimate();
++
++  return (
++    <Card>
++      <CardHeader className="flex flex-row items-center justify-between gap-2">
++        <div className="flex flex-1 flex-wrap items-center gap-2">
++          <Input value={day.title} onChange={(e) => onUpdateDay({ title: e.target.value })} className="max-w-[200px]" />
++          <Select
++            value={day.type}
++            onChange={(e) => onUpdateDay({ type: e.target.value as DayDraft["type"] })}
++            className="max-w-[140px]"
++          >
++            <option value="strength">Strength</option>
++            <option value="cardio">Cardio</option>
++            <option value="skill">Skill</option>
++            <option value="rest">Rest</option>
++          </Select>
++        </div>
++        <div className="flex shrink-0 items-center gap-1">
++          {day.type !== "rest" && (
++            <button
++              type="button"
++              onClick={onToggleExpanded}
++              className="rounded p-1.5 text-text-muted hover:bg-surface-2 hover:text-text"
++              aria-label={expanded ? "Done editing this day's exercises" : "Edit this day's exercises"}
++              title={expanded ? "Done" : "Edit exercises"}
++            >
++              {expanded ? <ChevronUp size={16} /> : <Pencil size={14} />}
++            </button>
++          )}
++          {canDelete && (
++            <button
++              onClick={onRemoveDay}
++              className="rounded p-1.5 text-text-muted hover:bg-surface-2 hover:text-accent-danger"
++              aria-label="Delete day"
++            >
++              <Trash2 size={16} />
++            </button>
++          )}
++        </div>
++      </CardHeader>
++
++      {day.type !== "rest" && !expanded && (
++        <CardContent className="pt-0">
++          <p className="text-xs text-text-muted">
++            {day.exercises.length === 0
++              ? "No exercises yet."
++              : `${day.exercises.length} exercise${day.exercises.length === 1 ? "" : "s"}: ${day.exercises
++                  .map((e) => e.exercise.name)
++                  .join(", ")}`}
++          </p>
++        </CardContent>
++      )}
++
++      {day.type !== "rest" && expanded && (
++        <CardContent className="space-y-3">
++          <ExercisePicker
++            exercises={exercises}
++            excludeIds={day.exercises.map((e) => e.exercise.id)}
++            allowedCategories={allowedCategories}
++            onSelect={(id) => {
++              const ex = exercises.find((e) => e.id === id);
++              if (ex) onAddExercise(ex);
++            }}
++          />
++          <div className="space-y-3" ref={exerciseListRef}>
++            {day.exercises.map((e) => {
++              const timed = e.exercise.trackingType === "duration";
++              return (
++                <div key={e.exercise.id} className="flex flex-wrap items-center gap-2 rounded bg-surface-2 px-3 py-2 text-sm">
++                  <span className="flex-1 min-w-[120px] font-medium">{e.exercise.name}</span>
++                  <span className="text-[10px] text-text-muted">{EQUIPMENT_LABELS[e.exercise.equipment]}</span>
++                  <Input
++                    className="w-16"
++                    value={e.sets}
++                    onChange={(ev) => onUpdateExerciseField(e.exercise.id, { sets: ev.target.value })}
++                    placeholder="Sets"
++                  />
++                  {timed ? (
++                    <Input
++                      className="w-24"
++                      value={e.durationSec}
++                      onChange={(ev) => onUpdateExerciseField(e.exercise.id, { durationSec: ev.target.value })}
++                      placeholder="Seconds"
++                    />
++                  ) : (
++                    <Input
++                      className="w-20"
++                      value={e.reps}
++                      onChange={(ev) => onUpdateExerciseField(e.exercise.id, { reps: ev.target.value })}
++                      placeholder="Reps"
++                    />
++                  )}
++                  <Input
++                    className="w-20"
++                    value={e.restSec}
++                    onChange={(ev) => onUpdateExerciseField(e.exercise.id, { restSec: ev.target.value })}
++                    placeholder="Rest s"
++                  />
++                  <button onClick={() => onRemoveExercise(e.exercise.id)} className="text-text-muted hover:text-accent-danger">
++                    <Trash2 size={14} />
++                  </button>
++                </div>
++              );
++            })}
++          </div>
++        </CardContent>
++      )}
++    </Card>
++  );
++}
+diff --git a/src/components/ui/animated-list.tsx b/src/components/ui/animated-list.tsx
+new file mode 100644
+index 0000000..336e360
+--- /dev/null
++++ b/src/components/ui/animated-list.tsx
+@@ -0,0 +1,16 @@
++"use client";
++
++import { useAutoAnimate } from "@formkit/auto-animate/react";
++
++/** Wraps server-rendered list children in an auto-animating container.
++ * Lets a plain Server Component page keep its data-fetching + .map() as
++ * server code, without converting the whole page (or duplicating its
++ * list markup) into a client component just to get a ref onto the list. */
++export function AnimatedList({ children, className }: { children: React.ReactNode; className?: string }) {
++  const [ref] = useAutoAnimate();
++  return (
++    <div ref={ref} className={className}>
++      {children}
++    </div>
++  );
++}
+diff --git a/src/components/ui/card.tsx b/src/components/ui/card.tsx
+index 7b13130..2b43f68 100644
+--- a/src/components/ui/card.tsx
++++ b/src/components/ui/card.tsx
+@@ -1,15 +1,22 @@
+-import { HTMLAttributes } from "react";
++import { HTMLAttributes, Ref } from "react";
+ import { cn } from "@/lib/cn";
+ 
+ interface CardProps extends HTMLAttributes<HTMLDivElement> {
+   /** Adds hover lift + the theme's glow — use for genuinely clickable
+    * cards (nav-like links, program cards), not static content panels. */
+   interactive?: boolean;
++  /** React 19 accepts ref as a plain prop on function components — no
++   * forwardRef needed. Typed explicitly (rather than via
++   * ComponentProps<"div">) so the rest of the file's existing prop-typing
++   * style doesn't have to change. Used by auto-animate's useAutoAnimate(),
++   * which needs a ref straight onto the list container it's animating. */
++  ref?: Ref<HTMLDivElement>;
+ }
+ 
+-export function Card({ className, interactive, ...props }: CardProps) {
++export function Card({ className, interactive, ref, ...props }: CardProps) {
+   return (
+     <div
++      ref={ref}
+       className={cn(
+         // card-interactive drives the per-theme hover flourish (rule line,
+         // glitch nudge, signal flash, light sweep) — applied to every card
+@@ -37,6 +44,6 @@ export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingEle
+   );
+ }
+ 
+-export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+-  return <div className={cn("px-5 pb-5", className)} {...props} />;
++export function CardContent({ className, ref, ...props }: HTMLAttributes<HTMLDivElement> & { ref?: Ref<HTMLDivElement> }) {
++  return <div ref={ref} className={cn("px-5 pb-5", className)} {...props} />;
+ }
+diff --git a/src/components/workout/exercise-picker.tsx b/src/components/workout/exercise-picker.tsx
+index e9b6d41..0abb802 100644
+--- a/src/components/workout/exercise-picker.tsx
++++ b/src/components/workout/exercise-picker.tsx
+@@ -122,7 +122,7 @@ export function ExercisePicker({
+         createPortal(
+           <div
+             ref={dropdownRef}
+-            className="fixed z-[100] max-h-72 overflow-y-auto rounded-md border border-border bg-surface-2 shadow-lg"
++            className="tooltip-pop fixed z-[100] max-h-72 overflow-y-auto rounded-md border border-border bg-surface-2 shadow-lg"
+             style={{ top: coords.top + 4, left: coords.left, width: coords.width }}
+           >
+             {grouped.size === 0 && (
+diff --git a/src/components/workout/live-session-client.tsx b/src/components/workout/live-session-client.tsx
+index 14027a4..3627c50 100644
+--- a/src/components/workout/live-session-client.tsx
++++ b/src/components/workout/live-session-client.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import { useMemo, useState, useTransition, useEffect, useRef } from "react";
++import { useAutoAnimate } from "@formkit/auto-animate/react";
+ import { Trash2, Flame, Clock, Activity, BedDouble } from "lucide-react";
+ import { ExercisePicker, type ExerciseOption } from "./exercise-picker";
+ import { RestTimerDisplay } from "./rest-timer-display";
+@@ -93,6 +94,11 @@ export function LiveSessionClient({
+ }) {
+   const timer = useRestTimer();
+   const [isPending, startTransition] = useTransition();
++  // Keys here are already stable (real exercise ids, not array index — see
++  // PATCHING.md-style reasoning in custom-program-builder.tsx for why that
++  // distinction matters), so auto-animate's enter/exit detection lands on
++  // the right card instead of whichever one happens to sit at the end.
++  const [exerciseListRef] = useAutoAnimate();
+ 
+   const exerciseById = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
+   const prefillById = useMemo(() => new Map(prefillExercises.map((p) => [p.exerciseId, p])), [prefillExercises]);
+@@ -247,7 +253,7 @@ export function LiveSessionClient({
+         />
+       </div>
+ 
+-      <div className="space-y-4">
++      <div className="space-y-4" ref={exerciseListRef}>
+         {activeIds.length === 0 && (
+           <p className="text-sm text-text-muted">Add an exercise above to start logging sets.</p>
+         )}
+diff --git a/src/components/workout/logged-workout-form.tsx b/src/components/workout/logged-workout-form.tsx
+index 8cdbc18..0f577c0 100644
+--- a/src/components/workout/logged-workout-form.tsx
++++ b/src/components/workout/logged-workout-form.tsx
+@@ -1,6 +1,7 @@
+ "use client";
+ 
+ import { useMemo, useState, useTransition } from "react";
++import { useAutoAnimate } from "@formkit/auto-animate/react";
+ import { Trash2 } from "lucide-react";
+ import { ExercisePicker, type ExerciseOption } from "./exercise-picker";
+ import { createLoggedWorkout, type LoggedSetInput } from "@/lib/actions/workouts";
+@@ -11,6 +12,13 @@ import { EQUIPMENT_LABELS, categoriesForWorkoutType } from "@/lib/data/exercise-
+ import { WorkoutTypeSelector, type WorkoutType } from "./workout-type-selector";
+ 
+ interface DraftSet {
++  /** Client-only identity for React/animation purposes — never sent to the
++   * server (the submit payload below only reads reps/durationSec/weight/
++   * warmup off each set). Without a stable key here, deleting a set from
++   * the middle of the list makes React reuse existing DOM nodes for the
++   * shifted rows and only truly remove the last one — so the delete
++   * animation would play on the wrong row. */
++  id: string;
+   reps: string;
+   durationSec: string;
+   weight: string;
+@@ -27,7 +35,7 @@ function usesWeight(equipment: string) {
+ }
+ 
+ function emptySet(): DraftSet {
+-  return { reps: "", durationSec: "", weight: "", warmup: false };
++  return { id: crypto.randomUUID(), reps: "", durationSec: "", weight: "", warmup: false };
+ }
+ 
+ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }) {
+@@ -41,6 +49,7 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
+   const [notes, setNotes] = useState("");
+   const [drafts, setDrafts] = useState<DraftExercise[]>([]);
+   const [error, setError] = useState<string | null>(null);
++  const [exerciseListRef] = useAutoAnimate();
+ 
+   const allowedCategories = useMemo(() => categoriesForWorkoutType(workoutType), [workoutType]);
+ 
+@@ -143,75 +152,17 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
+         placeholder={workoutType === "manual" ? "Add any exercise…" : `Add a ${workoutType} exercise…`}
+       />
+ 
+-      <div className="space-y-4">
+-        {drafts.map((d, exIdx) => {
+-          const showWeight = usesWeight(d.exercise.equipment);
+-          const timed = d.exercise.trackingType === "duration";
+-          return (
+-            <Card key={d.exercise.id}>
+-              <CardHeader className="flex flex-row items-center justify-between">
+-                <CardTitle className="text-base">{d.exercise.name}</CardTitle>
+-                <div className="flex items-center gap-3">
+-                  <span className="text-[11px] text-text-muted">{EQUIPMENT_LABELS[d.exercise.equipment]}</span>
+-                  <button onClick={() => removeExercise(exIdx)} className="text-text-muted hover:text-accent-danger">
+-                    <Trash2 size={15} />
+-                  </button>
+-                </div>
+-              </CardHeader>
+-              <CardContent className="space-y-2">
+-                {d.sets.map((s, setIdx) => (
+-                  <div key={setIdx} className="flex flex-wrap items-center gap-2">
+-                    <span className="w-5 font-mono text-xs text-text-muted">{setIdx + 1}</span>
+-                    {timed ? (
+-                      <Input
+-                        type="number"
+-                        placeholder="Seconds held"
+-                        className="w-32"
+-                        value={s.durationSec}
+-                        onChange={(e) => updateSet(exIdx, setIdx, { durationSec: e.target.value })}
+-                      />
+-                    ) : (
+-                      <Input
+-                        type="number"
+-                        placeholder="Reps"
+-                        className="w-20"
+-                        value={s.reps}
+-                        onChange={(e) => updateSet(exIdx, setIdx, { reps: e.target.value })}
+-                      />
+-                    )}
+-                    {showWeight && (
+-                      <Input
+-                        type="number"
+-                        step="0.5"
+-                        placeholder="kg"
+-                        className="w-24"
+-                        value={s.weight}
+-                        onChange={(e) => updateSet(exIdx, setIdx, { weight: e.target.value })}
+-                      />
+-                    )}
+-                    <label className="flex items-center gap-1.5 text-xs text-text-muted">
+-                      <input
+-                        type="checkbox"
+-                        checked={s.warmup}
+-                        onChange={(e) => updateSet(exIdx, setIdx, { warmup: e.target.checked })}
+-                      />
+-                      Warm-up
+-                    </label>
+-                    <button
+-                      onClick={() => removeSetRow(exIdx, setIdx)}
+-                      className="ml-auto text-text-muted hover:text-accent-danger"
+-                    >
+-                      <Trash2 size={14} />
+-                    </button>
+-                  </div>
+-                ))}
+-                <button onClick={() => addSetRow(exIdx)} className="text-xs text-accent-strength hover:underline">
+-                  + Add set
+-                </button>
+-              </CardContent>
+-            </Card>
+-          );
+-        })}
++      <div className="space-y-4" ref={exerciseListRef}>
++        {drafts.map((d, exIdx) => (
++          <DraftExerciseCard
++            key={d.exercise.id}
++            draft={d}
++            onRemoveExercise={() => removeExercise(exIdx)}
++            onUpdateSet={(setIdx, patch) => updateSet(exIdx, setIdx, patch)}
++            onAddSet={() => addSetRow(exIdx)}
++            onRemoveSet={(setIdx) => removeSetRow(exIdx, setIdx)}
++          />
++        ))}
+       </div>
+ 
+       {error && <p className="text-sm text-accent-danger">{error}</p>}
+@@ -222,3 +173,85 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
+     </div>
+   );
+ }
++
++function DraftExerciseCard({
++  draft,
++  onRemoveExercise,
++  onUpdateSet,
++  onAddSet,
++  onRemoveSet,
++}: {
++  draft: DraftExercise;
++  onRemoveExercise: () => void;
++  onUpdateSet: (setIdx: number, patch: Partial<DraftSet>) => void;
++  onAddSet: () => void;
++  onRemoveSet: (setIdx: number) => void;
++}) {
++  const showWeight = usesWeight(draft.exercise.equipment);
++  const timed = draft.exercise.trackingType === "duration";
++  const [setsListRef] = useAutoAnimate();
++
++  return (
++    <Card>
++      <CardHeader className="flex flex-row items-center justify-between">
++        <CardTitle className="text-base">{draft.exercise.name}</CardTitle>
++        <div className="flex items-center gap-3">
++          <span className="text-[11px] text-text-muted">{EQUIPMENT_LABELS[draft.exercise.equipment]}</span>
++          <button onClick={onRemoveExercise} className="text-text-muted hover:text-accent-danger">
++            <Trash2 size={15} />
++          </button>
++        </div>
++      </CardHeader>
++      <CardContent className="space-y-2">
++        <div className="space-y-2" ref={setsListRef}>
++          {draft.sets.map((s, setIdx) => (
++            <div key={s.id} className="flex flex-wrap items-center gap-2">
++              <span className="w-5 font-mono text-xs text-text-muted">{setIdx + 1}</span>
++              {timed ? (
++                <Input
++                  type="number"
++                  placeholder="Seconds held"
++                  className="w-32"
++                  value={s.durationSec}
++                  onChange={(e) => onUpdateSet(setIdx, { durationSec: e.target.value })}
++                />
++              ) : (
++                <Input
++                  type="number"
++                  placeholder="Reps"
++                  className="w-20"
++                  value={s.reps}
++                  onChange={(e) => onUpdateSet(setIdx, { reps: e.target.value })}
++                />
++              )}
++              {showWeight && (
++                <Input
++                  type="number"
++                  step="0.5"
++                  placeholder="kg"
++                  className="w-24"
++                  value={s.weight}
++                  onChange={(e) => onUpdateSet(setIdx, { weight: e.target.value })}
++                />
++              )}
++              <label className="flex items-center gap-1.5 text-xs text-text-muted">
++                <input
++                  type="checkbox"
++                  checked={s.warmup}
++                  onChange={(e) => onUpdateSet(setIdx, { warmup: e.target.checked })}
++                />
++                Warm-up
++              </label>
++              <button onClick={() => onRemoveSet(setIdx)} className="ml-auto text-text-muted hover:text-accent-danger">
++                <Trash2 size={14} />
++              </button>
++            </div>
++          ))}
++        </div>
++        <button onClick={onAddSet} className="text-xs text-accent-strength hover:underline">
++          + Add set
++        </button>
++      </CardContent>
++    </Card>
++  );
++}

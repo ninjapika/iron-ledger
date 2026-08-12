@@ -1,0 +1,22 @@
+diff --git a/src/components/layout/sidebar.tsx b/src/components/layout/sidebar.tsx
+index 0374cc2..cba7298 100644
+--- a/src/components/layout/sidebar.tsx
++++ b/src/components/layout/sidebar.tsx
+@@ -78,10 +78,16 @@ export function Sidebar({ displayName }: { displayName: string }) {
+   // Pinned is the only thing that ever decides expanded vs. rail on
+   // desktop now — no hover-expand. Hovering while unpinned does nothing;
+   // the only way back to the full sidebar is re-pinning it.
++  // sticky + h-screen (not h-full) is deliberate: the parent flex row is
++  // only min-h-screen, so on any page taller than one viewport it used to
++  // stretch this aside to match — pushing the pin button, way down in the
++  // footer, off past whatever the page's actual content height was. h-screen
++  // pins the sidebar's own height to the viewport regardless of how long the
++  // page is, and sticky keeps it in view as that page scrolls underneath it.
+   return (
+     <aside
+       className={cn(
+-        "hidden md:block md:shrink-0 border-r border-border bg-surface transition-[width]",
++        "sticky top-0 hidden h-screen shrink-0 overflow-y-auto border-r border-border bg-surface transition-[width] md:block",
+         TRANSITION,
+         pinned ? "md:w-60" : "md:w-20"
+       )}

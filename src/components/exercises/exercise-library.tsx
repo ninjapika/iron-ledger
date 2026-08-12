@@ -17,8 +17,14 @@ export interface LibraryExercise {
 
 type GroupBy = "category" | "equipment";
 
-const scrollRowClasses =
-  "flex gap-2 overflow-x-auto pb-2 snap-x snap-proximity [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [scrollbar-width:thin]";
+// Shared by both the search-results view and each category/equipment
+// group below — a plain wrapping grid, not a horizontal scroller. A
+// sideways-scrolling row reads fine for a curated handful of items, but
+// most groups here run well past what fits on one screen, so "scroll
+// down the page" turned into "scroll sideways through every group,
+// repeatedly" — worse, not better. Two columns even on narrow phones
+// still meaningfully cuts vertical length over one-per-row.
+const gridClasses = "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4";
 
 export function ExerciseLibrary({ catalog }: { catalog: LibraryExercise[] }) {
   const [query, setQuery] = useState("");
@@ -78,7 +84,7 @@ export function ExerciseLibrary({ catalog }: { catalog: LibraryExercise[] }) {
         searchResults.length === 0 ? (
           <p className="text-sm text-text-muted">No exercises match &ldquo;{query.trim()}&rdquo;.</p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={gridClasses}>
             {searchResults.map((ex) => (
               <ExerciseRow key={ex.id} {...ex} />
             ))}
@@ -90,11 +96,9 @@ export function ExerciseLibrary({ catalog }: { catalog: LibraryExercise[] }) {
             <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
               {labels[key] ?? key}
             </h2>
-            <div className={scrollRowClasses}>
+            <div className={gridClasses}>
               {list.map((ex) => (
-                <div key={ex.id} className="w-64 shrink-0 snap-start">
-                  <ExerciseRow {...ex} />
-                </div>
+                <ExerciseRow key={ex.id} {...ex} />
               ))}
             </div>
           </div>
