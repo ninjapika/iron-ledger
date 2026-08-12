@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { Trash2 } from "lucide-react";
 import { ExercisePicker, type ExerciseOption } from "./exercise-picker";
 import { createLoggedWorkout, type LoggedSetInput } from "@/lib/actions/workouts";
@@ -11,6 +12,13 @@ import { EQUIPMENT_LABELS, categoriesForWorkoutType } from "@/lib/data/exercise-
 import { WorkoutTypeSelector, type WorkoutType } from "./workout-type-selector";
 
 interface DraftSet {
+  /** Client-only identity for React/animation purposes — never sent to the
+   * server (the submit payload below only reads reps/durationSec/weight/
+   * warmup off each set). Without a stable key here, deleting a set from
+   * the middle of the list makes React reuse existing DOM nodes for the
+   * shifted rows and only truly remove the last one — so the delete
+   * animation would play on the wrong row. */
+  id: string;
   reps: string;
   durationSec: string;
   weight: string;
@@ -27,7 +35,7 @@ function usesWeight(equipment: string) {
 }
 
 function emptySet(): DraftSet {
-  return { reps: "", durationSec: "", weight: "", warmup: false };
+  return { id: crypto.randomUUID(), reps: "", durationSec: "", weight: "", warmup: false };
 }
 
 export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }) {
@@ -41,6 +49,7 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
   const [notes, setNotes] = useState("");
   const [drafts, setDrafts] = useState<DraftExercise[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [exerciseListRef] = useAutoAnimate();
 
   const allowedCategories = useMemo(() => categoriesForWorkoutType(workoutType), [workoutType]);
 
@@ -143,75 +152,17 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
         placeholder={workoutType === "manual" ? "Add any exercise…" : `Add a ${workoutType} exercise…`}
       />
 
-      <div className="space-y-4">
-        {drafts.map((d, exIdx) => {
-          const showWeight = usesWeight(d.exercise.equipment);
-          const timed = d.exercise.trackingType === "duration";
-          return (
-            <Card key={d.exercise.id}>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">{d.exercise.name}</CardTitle>
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-text-muted">{EQUIPMENT_LABELS[d.exercise.equipment]}</span>
-                  <button onClick={() => removeExercise(exIdx)} className="text-text-muted hover:text-accent-danger">
-                    <Trash2 size={15} />
-                  </button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {d.sets.map((s, setIdx) => (
-                  <div key={setIdx} className="flex flex-wrap items-center gap-2">
-                    <span className="w-5 font-mono text-xs text-text-muted">{setIdx + 1}</span>
-                    {timed ? (
-                      <Input
-                        type="number"
-                        placeholder="Seconds held"
-                        className="w-32"
-                        value={s.durationSec}
-                        onChange={(e) => updateSet(exIdx, setIdx, { durationSec: e.target.value })}
-                      />
-                    ) : (
-                      <Input
-                        type="number"
-                        placeholder="Reps"
-                        className="w-20"
-                        value={s.reps}
-                        onChange={(e) => updateSet(exIdx, setIdx, { reps: e.target.value })}
-                      />
-                    )}
-                    {showWeight && (
-                      <Input
-                        type="number"
-                        step="0.5"
-                        placeholder="kg"
-                        className="w-24"
-                        value={s.weight}
-                        onChange={(e) => updateSet(exIdx, setIdx, { weight: e.target.value })}
-                      />
-                    )}
-                    <label className="flex items-center gap-1.5 text-xs text-text-muted">
-                      <input
-                        type="checkbox"
-                        checked={s.warmup}
-                        onChange={(e) => updateSet(exIdx, setIdx, { warmup: e.target.checked })}
-                      />
-                      Warm-up
-                    </label>
-                    <button
-                      onClick={() => removeSetRow(exIdx, setIdx)}
-                      className="ml-auto text-text-muted hover:text-accent-danger"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button onClick={() => addSetRow(exIdx)} className="text-xs text-accent-strength hover:underline">
-                  + Add set
-                </button>
-              </CardContent>
-            </Card>
-          );
-        })}
+      <div className="space-y-4" ref={exerciseListRef}>
+        {drafts.map((d, exIdx) => (
+          <DraftExerciseCard
+            key={d.exercise.id}
+            draft={d}
+            onRemoveExercise={() => removeExercise(exIdx)}
+            onUpdateSet={(setIdx, patch) => updateSet(exIdx, setIdx, patch)}
+            onAddSet={() => addSetRow(exIdx)}
+            onRemoveSet={(setIdx) => removeSetRow(exIdx, setIdx)}
+          />
+        ))}
       </div>
 
       {error && <p className="text-sm text-accent-danger">{error}</p>}
@@ -220,5 +171,87 @@ export function LoggedWorkoutForm({ exercises }: { exercises: ExerciseOption[] }
         {isPending ? "Saving…" : "Save Workout"}
       </Button>
     </div>
+  );
+}
+
+function DraftExerciseCard({
+  draft,
+  onRemoveExercise,
+  onUpdateSet,
+  onAddSet,
+  onRemoveSet,
+}: {
+  draft: DraftExercise;
+  onRemoveExercise: () => void;
+  onUpdateSet: (setIdx: number, patch: Partial<DraftSet>) => void;
+  onAddSet: () => void;
+  onRemoveSet: (setIdx: number) => void;
+}) {
+  const showWeight = usesWeight(draft.exercise.equipment);
+  const timed = draft.exercise.trackingType === "duration";
+  const [setsListRef] = useAutoAnimate();
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">{draft.exercise.name}</CardTitle>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-text-muted">{EQUIPMENT_LABELS[draft.exercise.equipment]}</span>
+          <button onClick={onRemoveExercise} className="text-text-muted hover:text-accent-danger">
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="space-y-2" ref={setsListRef}>
+          {draft.sets.map((s, setIdx) => (
+            <div key={s.id} className="flex flex-wrap items-center gap-2">
+              <span className="w-5 font-mono text-xs text-text-muted">{setIdx + 1}</span>
+              {timed ? (
+                <Input
+                  type="number"
+                  placeholder="Seconds held"
+                  className="w-32"
+                  value={s.durationSec}
+                  onChange={(e) => onUpdateSet(setIdx, { durationSec: e.target.value })}
+                />
+              ) : (
+                <Input
+                  type="number"
+                  placeholder="Reps"
+                  className="w-20"
+                  value={s.reps}
+                  onChange={(e) => onUpdateSet(setIdx, { reps: e.target.value })}
+                />
+              )}
+              {showWeight && (
+                <Input
+                  type="number"
+                  step="0.5"
+                  placeholder="kg"
+                  className="w-24"
+                  value={s.weight}
+                  onChange={(e) => onUpdateSet(setIdx, { weight: e.target.value })}
+                />
+              )}
+              <label className="flex items-center gap-1.5 text-xs text-text-muted">
+                <input
+                  type="checkbox"
+                  checked={s.warmup}
+                  onChange={(e) => onUpdateSet(setIdx, { warmup: e.target.checked })}
+                />
+                Warm-up
+              </label>
+              <button onClick={() => onRemoveSet(setIdx)} className="ml-auto text-text-muted hover:text-accent-danger">
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+        <button onClick={onAddSet} className="text-xs text-accent-strength hover:underline">
+          + Add set
+        </button>
+      </CardContent>
+    </Card>
   );
 }

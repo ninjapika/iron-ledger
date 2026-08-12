@@ -122,7 +122,7 @@ export function ExercisePicker({
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[100] max-h-72 overflow-y-auto rounded-md border border-border bg-surface-2 shadow-lg"
+            className="tooltip-pop fixed z-[100] max-h-72 overflow-y-auto rounded-md border border-border bg-surface-2 shadow-lg"
             style={{ top: coords.top + 4, left: coords.left, width: coords.width }}
           >
             {grouped.size === 0 && (

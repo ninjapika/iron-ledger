@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getBodyMetricHistory, deleteBodyMetric } from "@/lib/actions/tracking";
 import { getBodyWeightTrend } from "@/lib/data/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnimatedList } from "@/components/ui/animated-list";
 import { BodyMetricForm } from "@/components/body/body-metric-form";
 import { BodyWeightTrendChart } from "@/components/charts/bodyweight-trend-chart";
 
@@ -35,7 +36,7 @@ export default async function BodyMetricsPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-2">
+      <AnimatedList className="space-y-2">
         {history.map((h) => {
           const measurements = h.measurements ? (JSON.parse(h.measurements) as Record<string, number>) : null;
           return (
@@ -60,7 +61,7 @@ export default async function BodyMetricsPage() {
             </div>
           );
         })}
-      </div>
+      </AnimatedList>
     </div>
   );
 }

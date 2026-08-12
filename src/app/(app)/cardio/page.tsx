@@ -3,6 +3,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { getCardioHistory, deleteCardioSession } from "@/lib/actions/tracking";
 import { getCardioTrend } from "@/lib/data/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AnimatedList } from "@/components/ui/animated-list";
 import { CardioForm } from "@/components/cardio/cardio-form";
 import { CardioTrendChart } from "@/components/charts/cardio-trend-chart";
 import { formatDuration, formatPace } from "@/lib/format";
@@ -52,7 +53,7 @@ export default async function CardioPage() {
         </Card>
       )}
 
-      <div className="space-y-2">
+      <AnimatedList className="space-y-2">
         {history.map((h) => (
           <div key={h.id} className="flex items-center justify-between rounded-theme border border-border bg-surface px-4 py-3 text-sm">
             <div>
@@ -77,7 +78,7 @@ export default async function CardioPage() {
             </form>
           </div>
         ))}
-      </div>
+      </AnimatedList>
     </div>
   );
 }

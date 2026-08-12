@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { updateSet, addHistorySet, deleteHistorySet, updateSessionNotes, deleteWorkoutSession } from "@/lib/actions/history";
 import { ExercisePicker, type ExerciseOption } from "@/components/workout/exercise-picker";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,7 @@ export function SessionEditor({
   const [isPending, startTransition] = useTransition();
   const [notes, setNotes] = useState(initialNotes);
   const [savedNotes, setSavedNotes] = useState(false);
+  const [groupsListRef] = useAutoAnimate();
 
   const byExercise = new Map<string, SetRow[]>();
   for (const s of sets) {
@@ -95,99 +97,21 @@ export function SessionEditor({
     <div className="max-w-2xl space-y-3">
       <ExercisePicker exercises={exercises} excludeIds={activeExerciseIds} onSelect={addSet} placeholder="Add an exercise you forgot…" />
 
-      <Card className="divide-y divide-border overflow-hidden">
+      <Card className="divide-y divide-border overflow-hidden" ref={groupsListRef}>
         {byExercise.size === 0 && (
           <p className="px-3 py-4 text-sm text-text-muted">No exercises logged yet — add one above.</p>
         )}
-        {[...byExercise.entries()].map(([name, exSets]) => {
-          const usesWeight = exSets[0]?.equipment !== "bodyweight" && exSets[0]?.equipment !== "cardio";
-          const timed = exSets[0]?.trackingType === "duration";
-          // Fixed column template per exercise (weight column only exists
-          // when this exercise actually uses one) so every set row within
-          // it lines up exactly, instead of inputs floating at ad hoc
-          // widths with a lot of empty trailing space.
-          const cols = usesWeight ? "1.4rem 1.6rem 1fr 1fr 1fr 1.6rem" : "1.4rem 1.6rem 1fr 1fr 1.6rem";
-          return (
-            <div key={name} className="px-3 py-2.5">
-              <div className="mb-1.5 flex items-baseline justify-between gap-2">
-                <h3 className="truncate font-display text-sm uppercase tracking-wide text-text">{name}</h3>
-                <span className="shrink-0 text-[10px] text-text-muted">{EQUIPMENT_LABELS[exSets[0]?.equipment] ?? ""}</span>
-              </div>
-              <div className="space-y-1">
-                <div
-                  className="grid items-center gap-1 px-1 text-[10px] uppercase tracking-wide text-text-muted"
-                  style={{ gridTemplateColumns: cols }}
-                >
-                  <span />
-                  <span title="Warm-up">W</span>
-                  <span>{timed ? "Sec" : "Reps"}</span>
-                  {usesWeight && <span>Kg</span>}
-                  <span>RPE</span>
-                  <span />
-                </div>
-                {exSets.map((s) => (
-                  <div
-                    key={s.id}
-                    className="grid items-center gap-1 rounded-theme bg-surface-2 px-1 py-1"
-                    style={{ gridTemplateColumns: cols }}
-                  >
-                    <span className="text-xs text-text-muted">#{s.setNumber}</span>
-                    <input
-                      type="checkbox"
-                      title="Warm-up set"
-                      defaultChecked={s.isWarmup}
-                      onChange={(e) => saveField(s.id, { isWarmup: e.target.checked })}
-                      className="h-3.5 w-3.5 accent-accent-strength"
-                    />
-                    {timed ? (
-                      <input
-                        type="number"
-                        defaultValue={s.durationSec ?? ""}
-                        onBlur={(e) => saveField(s.id, { durationSec: e.target.value ? Number(e.target.value) : undefined })}
-                        className={cellInput}
-                      />
-                    ) : (
-                      <input
-                        type="number"
-                        defaultValue={s.reps ?? ""}
-                        onBlur={(e) => saveField(s.id, { reps: e.target.value ? Number(e.target.value) : undefined })}
-                        className={cellInput}
-                      />
-                    )}
-                    {usesWeight && (
-                      <input
-                        type="number"
-                        step="0.5"
-                        defaultValue={s.weightKg ?? ""}
-                        onBlur={(e) => saveField(s.id, { weightKg: e.target.value ? Number(e.target.value) : undefined })}
-                        className={cellInput}
-                      />
-                    )}
-                    <input
-                      type="number"
-                      step="0.5"
-                      min={6}
-                      max={10}
-                      defaultValue={s.rpe ?? ""}
-                      onBlur={(e) => saveField(s.id, { rpe: e.target.value ? Number(e.target.value) : undefined })}
-                      className={cellInput}
-                    />
-                    <button onClick={() => removeSet(s.id)} className="text-text-muted hover:text-accent-danger" title="Delete set">
-                      <Trash2 size={13} className="mx-auto" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <button
-                onClick={() => addSet(exSets[0].exerciseId)}
-                disabled={isPending}
-                className="mt-1.5 text-xs text-accent-strength hover:underline"
-              >
-                + Add set
-              </button>
-            </div>
-          );
-        })}
+        {[...byExercise.entries()].map(([name, exSets]) => (
+          <ExerciseSetGroup
+            key={name}
+            name={name}
+            exSets={exSets}
+            isPending={isPending}
+            onSaveField={saveField}
+            onAddSet={addSet}
+            onRemoveSet={removeSet}
+          />
+        ))}
       </Card>
 
       <Card className={cn("px-3 py-2.5")}>
@@ -205,6 +129,112 @@ export function SessionEditor({
       <Button variant="danger" onClick={removeSession} disabled={isPending} className="text-sm">
         Delete this workout
       </Button>
+    </div>
+  );
+}
+
+function ExerciseSetGroup({
+  name,
+  exSets,
+  isPending,
+  onSaveField,
+  onAddSet,
+  onRemoveSet,
+}: {
+  name: string;
+  exSets: SetRow[];
+  isPending: boolean;
+  onSaveField: (setId: string, patch: Parameters<typeof updateSet>[1]) => void;
+  onAddSet: (exerciseId: string) => void;
+  onRemoveSet: (setId: string) => void;
+}) {
+  const usesWeight = exSets[0]?.equipment !== "bodyweight" && exSets[0]?.equipment !== "cardio";
+  const timed = exSets[0]?.trackingType === "duration";
+  // Fixed column template per exercise (weight column only exists when
+  // this exercise actually uses one) so every set row within it lines up
+  // exactly, instead of inputs floating at ad hoc widths with a lot of
+  // empty trailing space.
+  const cols = usesWeight ? "1.4rem 1.6rem 1fr 1fr 1fr 1.6rem" : "1.4rem 1.6rem 1fr 1fr 1.6rem";
+  const [setsListRef] = useAutoAnimate();
+
+  return (
+    <div className="px-3 py-2.5">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <h3 className="truncate font-display text-sm uppercase tracking-wide text-text">{name}</h3>
+        <span className="shrink-0 text-[10px] text-text-muted">{EQUIPMENT_LABELS[exSets[0]?.equipment] ?? ""}</span>
+      </div>
+      <div className="space-y-1" ref={setsListRef}>
+        <div
+          className="grid items-center gap-1 px-1 text-[10px] uppercase tracking-wide text-text-muted"
+          style={{ gridTemplateColumns: cols }}
+        >
+          <span />
+          <span title="Warm-up">W</span>
+          <span>{timed ? "Sec" : "Reps"}</span>
+          {usesWeight && <span>Kg</span>}
+          <span>RPE</span>
+          <span />
+        </div>
+        {exSets.map((s) => (
+          <div
+            key={s.id}
+            className="grid items-center gap-1 rounded-theme bg-surface-2 px-1 py-1"
+            style={{ gridTemplateColumns: cols }}
+          >
+            <span className="text-xs text-text-muted">#{s.setNumber}</span>
+            <input
+              type="checkbox"
+              title="Warm-up set"
+              defaultChecked={s.isWarmup}
+              onChange={(e) => onSaveField(s.id, { isWarmup: e.target.checked })}
+              className="h-3.5 w-3.5 accent-accent-strength"
+            />
+            {timed ? (
+              <input
+                type="number"
+                defaultValue={s.durationSec ?? ""}
+                onBlur={(e) => onSaveField(s.id, { durationSec: e.target.value ? Number(e.target.value) : undefined })}
+                className={cellInput}
+              />
+            ) : (
+              <input
+                type="number"
+                defaultValue={s.reps ?? ""}
+                onBlur={(e) => onSaveField(s.id, { reps: e.target.value ? Number(e.target.value) : undefined })}
+                className={cellInput}
+              />
+            )}
+            {usesWeight && (
+              <input
+                type="number"
+                step="0.5"
+                defaultValue={s.weightKg ?? ""}
+                onBlur={(e) => onSaveField(s.id, { weightKg: e.target.value ? Number(e.target.value) : undefined })}
+                className={cellInput}
+              />
+            )}
+            <input
+              type="number"
+              step="0.5"
+              min={6}
+              max={10}
+              defaultValue={s.rpe ?? ""}
+              onBlur={(e) => onSaveField(s.id, { rpe: e.target.value ? Number(e.target.value) : undefined })}
+              className={cellInput}
+            />
+            <button onClick={() => onRemoveSet(s.id)} className="text-text-muted hover:text-accent-danger" title="Delete set">
+              <Trash2 size={13} className="mx-auto" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => onAddSet(exSets[0].exerciseId)}
+        disabled={isPending}
+        className="mt-1.5 text-xs text-accent-strength hover:underline"
+      >
+        + Add set
+      </button>
     </div>
   );
 }

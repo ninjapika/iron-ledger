@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, useEffect, useRef } from "react";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { Trash2, Flame, Clock, Activity, BedDouble } from "lucide-react";
 import { ExercisePicker, type ExerciseOption } from "./exercise-picker";
 import { RestTimerDisplay } from "./rest-timer-display";
@@ -93,6 +94,11 @@ export function LiveSessionClient({
 }) {
   const timer = useRestTimer();
   const [isPending, startTransition] = useTransition();
+  // Keys here are already stable (real exercise ids, not array index — see
+  // PATCHING.md-style reasoning in custom-program-builder.tsx for why that
+  // distinction matters), so auto-animate's enter/exit detection lands on
+  // the right card instead of whichever one happens to sit at the end.
+  const [exerciseListRef] = useAutoAnimate();
 
   const exerciseById = useMemo(() => new Map(exercises.map((e) => [e.id, e])), [exercises]);
   const prefillById = useMemo(() => new Map(prefillExercises.map((p) => [p.exerciseId, p])), [prefillExercises]);
@@ -247,7 +253,7 @@ export function LiveSessionClient({
         />
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4" ref={exerciseListRef}>
         {activeIds.length === 0 && (
           <p className="text-sm text-text-muted">Add an exercise above to start logging sets.</p>
         )}
